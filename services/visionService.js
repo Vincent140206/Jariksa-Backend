@@ -157,7 +157,7 @@ function getColorToDamage(domain, labels) {
 const analyzeImage = async (filePath) => {
     try {
         const [result] = await visionClient.annotateImage({
-            image: { source: { filename: filePath } },
+            image: { source: { imageUri: filePath } },
             features: [
                 { type: 'LABEL_DETECTION', maxResults: 25 },
                 { type: 'OBJECT_LOCALIZATION', maxResults: 10 },
