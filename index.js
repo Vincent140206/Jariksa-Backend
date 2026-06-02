@@ -7,6 +7,7 @@ const healthRoutes = require('./routes/healthRoutes');
 const aiRoutes = require('./routes/aiRoutes');
 const authRoutes = require('./routes/authRoutes');
 const businessRoutes = require('./routes/businessRoutes');
+const customerRoutes = require('./routes/customerRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -23,3 +24,4 @@ app.listen(port, () => {
 app.use('/api/ai', aiRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
+app.use('/api/customers', customerRoutes);
