@@ -36,6 +36,26 @@ const seedDatabase = async () => {
                 price INTEGER NOT NULL,
                 unit VARCHAR(50) DEFAULT 'kg'
             );
+
+            CREATE TABLE orders (
+                id SERIAL PRIMARY KEY,
+                store_id INTEGER REFERENCES stores(id) ON DELETE CASCADE,
+                customer_id INTEGER REFERENCES customers(id) ON DELETE CASCADE,
+                total_price INTEGER NOT NULL DEFAULT 0,
+                status VARCHAR(50) DEFAULT 'Pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE order_items (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+                service_id INTEGER REFERENCES services(id) ON DELETE SET NULL,
+                quantity DECIMAL NOT NULL DEFAULT 1,
+                price INTEGER NOT NULL,
+                image_url VARCHAR(255),
+                ai_status VARCHAR(50),
+                ai_report JSONB
+            );
         `;
 
         await pool.query(createTablesQuery);
