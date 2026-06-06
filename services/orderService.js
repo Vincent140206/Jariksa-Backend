@@ -69,10 +69,38 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
 
         const orderItems = [];
         for (const item of items) {
+            let imageUrlsToSave = null;
+            let aiStatusToSave = null;
+            let aiReportToSave = null;
+
+            if (item.scan_id) {
+                const scanData = await client.query(
+                    'SELECT image_urls, ai_status, ai_report FROM scan_results WHERE id = $1 AND store_id = $2',
+                    [item.scan_id, storeId]
+                );
+
+                if (scanData.rows.length === 0) {
+                    throw new Error(`Data scan AI tidak ditemukan atau tidak valid untuk scan_id: ${item.scan_id}`);
+                }
+
+                const scan = scanData.rows[0];
+                imageUrlsToSave = JSON.stringify(scan.image_urls);
+                aiStatusToSave = scan.ai_status;
+                aiReportToSave = JSON.stringify(scan.ai_report);
+            }
+
             const itemResult = await client.query(
-                `INSERT INTO order_items (order_id, service_id, quantity, price, image_url, ai_status, ai_report) 
+                `INSERT INTO order_items (order_id, service_id, quantity, price, image_urls, ai_status, ai_report) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-                [newOrder.id, item.service_id, item.quantity, item.price, item.image_url, item.ai_status, item.ai_report]
+                [
+                    newOrder.id,
+                    item.service_id,
+                    item.quantity,
+                    item.price,
+                    imageUrlsToSave,
+                    aiStatusToSave,
+                    aiReportToSave
+                ]
             );
             orderItems.push(itemResult.rows[0]);
         }
@@ -140,4 +168,20 @@ const getOrderDetails = async (orderId, storeId) => {
     };
 };
 
-module.exports = { createOrder, getOrdersByStoreId, getOrderDetails };
+const updateOrderStatus = async (orderId, storeId, newStatus) => {
+    const query = `
+        UPDATE orders 
+        SET status = $1 
+        WHERE id = $2 AND store_id = $3 
+        RETURNING *
+    `;
+    const result = await pool.query(query, [newStatus, orderId, storeId]);
+
+    if (result.rows.length === 0) {
+        throw new Error('Order not found or you do not have permission to update it');
+    }
+
+    return result.rows[0];
+};
+
+module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateOrderStatus };

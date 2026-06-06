@@ -3,7 +3,8 @@ const orderService = require('../services/orderService');
 const createNewOrder = async (req, res) => {
     try {
         const storeId = req.store.store_id;
-        const { customer_id, total_price, items } = req.body;
+
+        const { customer_id, total_price, items, promo_code } = req.body;
 
         if (!customer_id || !items || items.length === 0) {
             return res.status(400).json({
@@ -11,8 +12,7 @@ const createNewOrder = async (req, res) => {
                 message: 'Customer ID and at least one item are required'
             });
         }
-
-        const result = await orderService.createOrder(storeId, customer_id, total_price, items);
+        const result = await orderService.createOrder(storeId, customer_id, total_price, items, promo_code);
 
         res.status(201).json({
             status: 'success',
@@ -20,7 +20,7 @@ const createNewOrder = async (req, res) => {
             data: result
         });
     } catch (error) {
-        res.status(500).json({ status: 'error', message: error.message });
+        res.status(400).json({ status: 'error', message: error.message });
     }
 };
 
