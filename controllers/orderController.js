@@ -1,10 +1,11 @@
 const orderService = require('../services/orderService');
+const whatsappService = require('../services/whatsappService');
 
 const createNewOrder = async (req, res) => {
     try {
         const storeId = req.store.store_id;
 
-        const { customer_id, total_price, items, promo_code } = req.body;
+        const { customer_id, total_price, items, promo_code, payment_option } = req.body;
 
         if (!customer_id || !items || items.length === 0) {
             return res.status(400).json({
@@ -12,7 +13,27 @@ const createNewOrder = async (req, res) => {
                 message: 'Customer ID and at least one item are required'
             });
         }
-        const result = await orderService.createOrder(storeId, customer_id, total_price, items, promo_code);
+
+        const finalPaymentOption = payment_option || 'NOW';
+
+        const result = await orderService.createOrder(
+            storeId,
+            customer_id,
+            total_price,
+            items,
+            promo_code,
+            finalPaymentOption
+        );
+
+        whatsappService.sendReceiptWA(
+            result.customer.phone_number,
+            result.customer.name,
+            result.order.id,
+            result.order.total_price,
+            finalPaymentOption
+        );
+
+        if (result.customer) delete result.customer;
 
         res.status(201).json({
             status: 'success',
@@ -57,4 +78,22 @@ const getOrderById = async (req, res) => {
     }
 };
 
-module.exports = { createNewOrder, getAllOrders, getOrderById };
+const generateOrderPayment = async (req, res) => {
+    try {
+        const storeId = req.store.store_id;
+        const orderId = req.params.id;
+
+        const paymentData = await orderService.generatePaymentForExistingOrder(orderId, storeId);
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Link pembayaran QRIS berhasil dibuat',
+            data: paymentData
+        });
+    } catch (error) {
+        const statusCode = error.message.includes('tidak ditemukan') ? 404 : 400;
+        res.status(statusCode).json({ status: 'error', message: error.message });
+    }
+};
+
+module.exports = { createNewOrder, getAllOrders, getOrderById, generateOrderPayment };

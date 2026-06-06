@@ -1,0 +1,85 @@
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+
+const client = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    }
+});
+
+let isReady = false;
+
+client.on('qr', (qr) => {
+    console.log('SCAN QR CODE INI UNTUK LOGIN WHATSAPP:');
+    qrcode.generate(qr, { small: true });
+});
+
+client.on('ready', () => {
+    console.log('WhatsApp Client is READY!');
+    isReady = true;
+});
+
+client.on('disconnected', (reason) => {
+    console.log('WhatsApp Client DISCONNECTED!', reason);
+    isReady = false;
+});
+
+const initializeWhatsApp = () => {
+    client.initialize();
+};
+
+const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption) => {
+    if (!isReady) {
+        console.log('WhatsApp belum siap. Pesan ditunda.');
+        return;
+    }
+
+    try {
+        if (!customerPhone) {
+            console.log('Gagal kirim WA: Nomor HP kosong / undefined');
+            return;
+        }
+
+        let cleanNumber = customerPhone.replace(/\D/g, '');
+
+        if (cleanNumber.startsWith('0')) {
+            cleanNumber = '62' + cleanNumber.slice(1);
+        }
+
+        const chatId = `${cleanNumber}@c.us`;
+
+        const statusBayar = paymentOption === 'NOW' ? 'Lunas (QRIS)' : 'Belum Bayar (Bayar saat ambil)';
+
+        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan cucian Anda kepada Roketto Laundry.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${totalPrice.toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
+
+        await client.sendMessage(chatId, message);
+        console.log(`Struk WA berhasil dikirim ke ${cleanNumber}`);
+    } catch (error) {
+        console.error('Gagal mengirim WA di createOrder:', error.message);
+    }
+};
+
+const sendTestMessage = async (phoneNumber, message) => {
+    if (!isReady) {
+        throw new Error('WhatsApp belum siap! Cek terminal dan pastikan sudah scan QR Code.');
+    }
+
+    try {
+        let formattedPhone = phoneNumber.startsWith('0')
+            ? '62' + phoneNumber.slice(1)
+            : phoneNumber;
+
+        const chatId = `${formattedPhone}@c.us`;
+
+        await client.sendMessage(chatId, message);
+        console.log(`Pesan TEST berhasil dikirim ke ${formattedPhone}`);
+
+        return `Berhasil mengirim pesan ke ${formattedPhone}`;
+    } catch (error) {
+        console.error('Gagal mengirim pesan TEST:', error.message);
+        throw error;
+    }
+};
+
+module.exports = { initializeWhatsApp, sendReceiptWA, sendTestMessage };

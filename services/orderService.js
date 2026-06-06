@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 const paymentService = require('./paymentService');
 
-const createOrder = async (storeId, customerId, totalPrice, items, promoCode = null) => {
+const createOrder = async (storeId, customerId, totalPrice, items, promoCode = null, paymentOption = 'NOW') => {
     const client = await pool.connect();
 
     try {
@@ -60,10 +60,12 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
 
         const finalTotalPrice = Math.max(0, totalPrice - discountAmount);
 
+        const initialStatus = paymentOption === 'NOW' ? 'Pending Payment' : 'Processing - Unpaid';
+
         const orderResult = await client.query(
-            `INSERT INTO orders (store_id, customer_id, total_price, status, promo_id, discount_amount) 
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-            [storeId, customerId, finalTotalPrice, 'Pending Payment', promoId, discountAmount]
+            `INSERT INTO orders (store_id, customer_id, total_price, status, promo_id, discount_amount, estimated_completion) 
+             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP + INTERVAL '3 days') RETURNING *`,
+            [storeId, customerId, finalTotalPrice, initialStatus, promoId, discountAmount]
         );
         const newOrder = orderResult.rows[0];
 
@@ -105,19 +107,23 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
             orderItems.push(itemResult.rows[0]);
         }
 
-        const midtransResponse = await paymentService.createPaymentToken(
-            newOrder.id,
-            finalTotalPrice,
-            customer.name,
-            customer.phone_number
-        );
+        let midtransResponse = null;
+        if (paymentOption === 'NOW') {
+            midtransResponse = await paymentService.createPaymentToken(
+                newOrder.id,
+                finalTotalPrice,
+                customer.name,
+                customer.phone_number
+            );
+        }
 
         await client.query('COMMIT');
 
         return {
             order: newOrder,
             items: orderItems,
-            payment: midtransResponse
+            payment: midtransResponse,
+            customer: customer
         };
     } catch (error) {
         await client.query('ROLLBACK');
@@ -184,4 +190,38 @@ const updateOrderStatus = async (orderId, storeId, newStatus) => {
     return result.rows[0];
 };
 
-module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateOrderStatus };
+const generatePaymentForExistingOrder = async (orderId, storeId) => {
+    const query = `
+        SELECT o.*, c.name as customer_name, c.phone_number 
+        FROM orders o
+        JOIN customers c ON o.customer_id = c.id
+        WHERE o.id = $1 AND o.store_id = $2
+    `;
+    const result = await pool.query(query, [orderId, storeId]);
+
+    if (result.rows.length === 0) {
+        throw new Error('Pesanan tidak ditemukan atau Anda tidak memiliki akses');
+    }
+
+    const order = result.rows[0];
+
+    if (['Paid', 'Completed'].includes(order.status)) {
+        throw new Error('Pesanan ini sudah lunas, tidak perlu bayar lagi.');
+    }
+
+    const midtransResponse = await paymentService.createPaymentToken(
+        order.id,
+        order.total_price,
+        order.customer_name,
+        order.phone_number
+    );
+
+    await pool.query(
+        'UPDATE orders SET status = $1 WHERE id = $2',
+        ['Pending Payment', orderId]
+    );
+
+    return midtransResponse;
+};
+
+module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateOrderStatus, generatePaymentForExistingOrder };
