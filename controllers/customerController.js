@@ -51,4 +51,37 @@ const getCustomers = async (req, res) => {
     }
 };
 
-module.exports = { checkCustomer, addCustomer, getCustomers };
+const getCustomersDashboard = async (req, res) => {
+    try {
+        const storeId = req.store.store_id;
+        const { search, filter } = req.query;
+
+        const data = await customerService.getCustomersList(storeId, search, filter);
+
+        res.status(200).json({
+            status: 'success',
+            data: data
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+const getCustomerDetails = async (req, res) => {
+    try {
+        const storeId = req.store.store_id;
+        const customerId = req.params.id;
+
+        const data = await customerService.getCustomerProfileDetails(storeId, customerId);
+
+        res.status(200).json({
+            status: 'success',
+            data: data
+        });
+    } catch (error) {
+        const statusCode = error.message.includes('tidak ditemukan') ? 404 : 500;
+        res.status(statusCode).json({ status: 'error', message: error.message });
+    }
+};
+
+module.exports = { checkCustomer, addCustomer, getCustomers, getCustomersDashboard, getCustomerDetails };
