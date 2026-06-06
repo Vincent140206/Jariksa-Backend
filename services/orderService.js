@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 const paymentService = require('./paymentService');
 
-const createOrder = async (storeId, customerId, totalPrice, items) => {
+const createOrder = async (storeId, customerId, totalPrice, items, promoCode = null) => {
     const client = await pool.connect();
 
     try {
@@ -11,9 +11,59 @@ const createOrder = async (storeId, customerId, totalPrice, items) => {
         if (customerData.rows.length === 0) throw new Error('Customer not found');
         const customer = customerData.rows[0];
 
+        let discountAmount = 0;
+        let promoId = null;
+
+        if (promoCode) {
+            const promoResult = await client.query(
+                'SELECT * FROM promos WHERE promo_code = $1 AND store_id = $2 AND is_active = true',
+                [promoCode.trim().toUpperCase(), storeId]
+            );
+
+            if (promoResult.rows.length > 0) {
+                const promo = promoResult.rows[0];
+                let isEligible = false;
+
+                if (promo.requirement_type === 'NONE') {
+                    isEligible = true;
+                } else if (promo.requirement_type === 'MIN_SPEND') {
+                    if (totalPrice >= promo.requirement_value) isEligible = true;
+                } else if (promo.requirement_type === 'MIN_ORDERS') {
+                    const orderCountResult = await client.query(
+                        `SELECT COUNT(*) FROM orders 
+                         WHERE customer_id = $1 AND store_id = $2 
+                         AND status NOT IN ('Payment Failed', 'Canceled')`,
+                        [customerId, storeId]
+                    );
+                    const pastOrders = parseInt(orderCountResult.rows[0].count);
+                    if (pastOrders >= promo.requirement_value) isEligible = true;
+                }
+
+                if (isEligible) {
+                    promoId = promo.id;
+                    if (promo.reward_type === 'FIXED') {
+                        discountAmount = promo.reward_value;
+                    } else if (promo.reward_type === 'PERCENT') {
+                        discountAmount = (totalPrice * promo.reward_value) / 100;
+                        if (promo.max_discount && discountAmount > promo.max_discount) {
+                            discountAmount = promo.max_discount;
+                        }
+                    } else if (promo.reward_type === 'FREE_SERVICE') {
+                        const matchingItem = items.find(item => parseInt(item.service_id) === promo.free_service_id);
+                        if (matchingItem) {
+                            discountAmount = matchingItem.price;
+                        }
+                    }
+                }
+            }
+        }
+
+        const finalTotalPrice = Math.max(0, totalPrice - discountAmount);
+
         const orderResult = await client.query(
-            'INSERT INTO orders (store_id, customer_id, total_price, status) VALUES ($1, $2, $3, $4) RETURNING *',
-            [storeId, customerId, totalPrice, 'Pending Payment']
+            `INSERT INTO orders (store_id, customer_id, total_price, status, promo_id, discount_amount) 
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+            [storeId, customerId, finalTotalPrice, 'Pending Payment', promoId, discountAmount]
         );
         const newOrder = orderResult.rows[0];
 
@@ -29,7 +79,7 @@ const createOrder = async (storeId, customerId, totalPrice, items) => {
 
         const midtransResponse = await paymentService.createPaymentToken(
             newOrder.id,
-            totalPrice,
+            finalTotalPrice,
             customer.name,
             customer.phone_number
         );
