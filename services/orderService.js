@@ -206,16 +206,16 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
         const formattedPrice = Number(customer.total_price).toLocaleString('id-ID');
 
         if (newStatus === 'Ready for Pickup') {
-            whatsappMessage = `Halo Kak ${customer.name},\n\nCucianmu dengan Order ID *#${orderId}* sudah SELESAI dan dikemas rapi nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${formattedPrice}*\n\nTerima kasih sudah mencuci di *${customer.store_name}*! 🧺`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nPesananmu dengan Order ID *#${orderId}* sudah SELESAI nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${formattedPrice}*\n\nTerima kasih telah menggunakan layanan dari *${customer.store_name}*! 📦`;
 
         } else if (newStatus === 'Delayed') {
-            whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf, proses pengerjaan cucianmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat.\n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏\n\nSalam hangat,\n*${customer.store_name}*`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf, proses pengerjaan pesananmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat.\n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏\n\nSalam hangat,\n*${customer.store_name}*`;
 
         } else if (newStatus === 'Completed') {
-            whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Cucian dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan pakaianmu kepada *${customer.store_name}*. Sampai jumpa di cucian berikutnya! 👋😊`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Pesanan dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan barangmu kepada *${customer.store_name}*. Sampai jumpa kembali! 👋😊`;
 
         } else if (newStatus === 'Pending Payment') {
-            whatsappMessage = `*Halo Kak ${customer.name}!* 👋\n\nTerima kasih telah mempercayakan cucian Anda kepada *${customer.store_name}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: *#${orderId}*\nTotal Tagihan: *Rp ${formattedPrice}*\nStatus Bayar: *Belum Lunas*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap dipickup.`;
+            whatsappMessage = `*Halo Kak ${customer.name}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${customer.store_name}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: *#${orderId}*\nTotal Tagihan: *Rp ${formattedPrice}*\nStatus Bayar: *Belum Lunas*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
         }
     }
 

@@ -51,7 +51,7 @@ const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, p
 
         const statusBayar = paymentOption === 'NOW' ? 'Lunas (QRIS)' : 'Belum Bayar (Bayar saat ambil)';
 
-        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan cucian Anda kepada *${storeName}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${Number(totalPrice).toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
+        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${storeName}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${Number(totalPrice).toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
 
         await client.sendMessage(chatId, message);
         console.log(`Struk WA berhasil dikirim ke ${cleanNumber}`);
