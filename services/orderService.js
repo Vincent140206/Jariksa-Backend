@@ -187,7 +187,7 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     const order = orderResult.rows[0];
 
     const customerQuery = `
-        SELECT o.id as order_id, o.total_price, c.name, c.phone 
+        SELECT o.id as order_id, o.total_price, c.name, c.phone_number 
         FROM orders o 
         JOIN customers c ON o.customer_id = c.id 
         WHERE o.id = $1
