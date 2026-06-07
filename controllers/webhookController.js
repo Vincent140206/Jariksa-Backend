@@ -5,6 +5,11 @@ const midtransNotification = async (req, res) => {
     try {
         const notification = req.body;
 
+        if (notification.order_id && notification.order_id.includes('payment_notif_test')) {
+            console.log('Tes dari Dashboard Midtrans diterima!');
+            return res.status(200).json({ status: 'success', message: 'Test notification received successfully' });
+        }
+
         const serverKey = process.env.MIDTRANS_SERVER_KEY;
 
         const hash = crypto.createHash('sha512');
