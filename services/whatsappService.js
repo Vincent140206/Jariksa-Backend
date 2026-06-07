@@ -82,4 +82,4 @@ const sendTestMessage = async (phoneNumber, message) => {
     }
 };
 
-module.exports = { initializeWhatsApp, sendReceiptWA, sendTestMessage };
+module.exports = { initializeWhatsApp, sendReceiptWA, sendTestMessage, client };
