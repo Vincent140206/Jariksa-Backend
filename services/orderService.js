@@ -209,7 +209,7 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
 
     if (whatsappMessage && customer.phone) {
         try {
-            let formattedPhone = customer.phone.replace(/[^0-9]/g, '');
+            let formattedPhone = customer.phone_number.replace(/[^0-9]/g, '');
             if (formattedPhone.startsWith('0')) {
                 formattedPhone = '62' + formattedPhone.slice(1);
             }
