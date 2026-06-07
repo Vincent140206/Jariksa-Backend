@@ -96,4 +96,27 @@ const generateOrderPayment = async (req, res) => {
     }
 };
 
-module.exports = { createNewOrder, getAllOrders, getOrderById, generateOrderPayment };
+const changeStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { status, message } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ status: 'error', message: 'Status wajib diisi' });
+        }
+
+        const updatedOrder = await orderService.updateStatusAndNotify(id, status, message);
+
+        res.status(200).json({
+            status: 'success',
+            message: `Status berhasil diubah menjadi ${status} dan notifikasi WA diproses`,
+            data: updatedOrder
+        });
+
+    } catch (error) {
+        console.error('Error changeStatus:', error.message);
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+module.exports = { createNewOrder, getAllOrders, getOrderById, generateOrderPayment, changeStatus };

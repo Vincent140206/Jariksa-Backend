@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const paymentService = require('./paymentService');
+const { client } = require('../services/whatsappService');
 
 const createOrder = async (storeId, customerId, totalPrice, items, promoCode = null, paymentOption = 'NOW') => {
     const client = await pool.connect();
@@ -174,20 +175,55 @@ const getOrderDetails = async (orderId, storeId) => {
     };
 };
 
-const updateOrderStatus = async (orderId, storeId, newStatus) => {
-    const query = `
-        UPDATE orders 
-        SET status = $1 
-        WHERE id = $2 AND store_id = $3 
-        RETURNING *
-    `;
-    const result = await pool.query(query, [newStatus, orderId, storeId]);
+const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) => {
 
-    if (result.rows.length === 0) {
-        throw new Error('Order not found or you do not have permission to update it');
+    const updateQuery = 'UPDATE orders SET status = $1 WHERE id = $2 RETURNING *';
+    const orderResult = await pool.query(updateQuery, [newStatus, orderId]);
+
+    if (orderResult.rowCount === 0) {
+        throw new Error('Pesanan tidak ditemukan');
     }
 
-    return result.rows[0];
+    const order = orderResult.rows[0];
+
+    const customerQuery = `
+        SELECT o.id as order_id, o.total_price, c.name, c.phone 
+        FROM orders o 
+        JOIN customers c ON o.customer_id = c.id 
+        WHERE o.id = $1
+    `;
+    const customerResult = await pool.query(customerQuery, [orderId]);
+    const customer = customerResult.rows[0];
+
+    let whatsappMessage = customMessage;
+
+    if (!whatsappMessage) {
+        if (newStatus === 'Ready for Pickup') {
+            whatsappMessage = `Halo Kak ${customer.name},\n\nCucianmu dengan Order ID *#${orderId}* sudah SELESAI dan dikemas rapi nih! ✨\nSilakan datang ke outlet untuk pengambilan ya. \n\nTotal Tagihan: *Rp ${Number(customer.total_price).toLocaleString('id-ID')}*.\n\nTerima kasih sudah mencuci di JaRiksa! 🧺`;
+        } else if (newStatus === 'Delayed') {
+            whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf yang sebesar-besarnya. Proses pengerjaan cucianmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat. \n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏`;
+        } else if (newStatus === 'Completed') {
+            whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Cucian dengan Order ID *#${orderId}* sudah sukses diambil. \n\nTerima kasih banyak telah memercayakan pakaianmu kepada JaRiksa. Sampai jumpa di cucian berikutnya! 👋😊`;
+        }
+    }
+
+    if (whatsappMessage && customer.phone) {
+        try {
+            let formattedPhone = customer.phone.replace(/[^0-9]/g, '');
+            if (formattedPhone.startsWith('0')) {
+                formattedPhone = '62' + formattedPhone.slice(1);
+            }
+
+            const whatsappId = `${formattedPhone}@c.us`;
+
+            await client.sendMessage(whatsappId, whatsappMessage);
+            console.log(`WA Notifikasi sukses dikirim ke ${customer.name} (${newStatus})`);
+        } catch (waError) {
+            console.error('Gagal mengirim WhatsApp:', waError.message);
+        }
+    }
+
+    return order;
 };
 
 const generatePaymentForExistingOrder = async (orderId, storeId) => {
@@ -245,4 +281,4 @@ const updateOrderStatusFromMidtrans = async (orderId, transactionStatus) => {
     return newStatus;
 };
 
-module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateOrderStatus, generatePaymentForExistingOrder, updateOrderStatusFromMidtrans };
+module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateStatusAndNotify, generatePaymentForExistingOrder, updateOrderStatusFromMidtrans };
