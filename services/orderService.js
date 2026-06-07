@@ -176,20 +176,13 @@ const getOrderDetails = async (orderId, storeId) => {
 };
 
 const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) => {
-    console.log(`\n[DEBUG-1] 🚀 Rute dipanggil! ID: ${orderId} | Status Baru: ${newStatus} | Msg: ${customMessage}`);
-
-    // 1. Update status pesanan di database
     const updateQuery = 'UPDATE orders SET status = $1 WHERE id = $2 RETURNING *';
     const orderResult = await pool.query(updateQuery, [newStatus, orderId]);
 
     if (orderResult.rowCount === 0) {
-        console.log('[DEBUG-2] ❌ Pesanan tidak ditemukan di DB!');
         throw new Error('Pesanan tidak ditemukan');
     }
 
-    console.log('[DEBUG-3] ✅ Status di DB berhasil diupdate!');
-
-    // 2. Ambil data nomor WA pelanggan
     const customerQuery = `
         SELECT o.id as order_id, o.total_price, c.name, c.phone_number 
         FROM orders o 
@@ -199,20 +192,19 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     const customerResult = await pool.query(customerQuery, [orderId]);
     const customer = customerResult.rows[0];
 
-    console.log(`[DEBUG-4] 👤 Data Customer -> Nama: ${customer?.name} | Phone DB: ${customer?.phone_number}`);
-
     let whatsappMessage = customMessage;
+
     if (!whatsappMessage) {
         if (newStatus === 'Ready for Pickup') {
-            whatsappMessage = `Halo Kak ${customer.name}, Cucianmu dengan Order ID #${orderId} sudah SELESAI nih! ✨`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nCucianmu dengan Order ID *#${orderId}* sudah SELESAI dan dikemas rapi nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${Number(customer.total_price).toLocaleString('id-ID')}*.\n\nTerima kasih sudah mencuci di JaRiksa! 🧺`;
+        } else if (newStatus === 'Delayed') {
+            whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf, proses pengerjaan cucianmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat.\n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏`;
+        } else if (newStatus === 'Completed') {
+            whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Cucian dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan pakaianmu kepada JaRiksa. Sampai jumpa di cucian berikutnya! 👋😊`;
         }
     }
 
-    console.log(`[DEBUG-5] 💬 Isi Pesan Final: ${whatsappMessage}`);
-
-    // Cek apakah masuk blok WA
     if (whatsappMessage && customer.phone_number) {
-        console.log(`[DEBUG-6] 🚪 Masuk ke pintu pengiriman WA...`);
         try {
             let formattedPhone = String(customer.phone_number).replace(/[^0-9]/g, '');
             if (formattedPhone.startsWith('0')) {
@@ -220,20 +212,15 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
             }
             const whatsappId = `${formattedPhone}@c.us`;
 
-            console.log(`[DEBUG-7] 🎯 Target Nomor WA: ${whatsappId}`);
-
-            // Cek apakah client WA beneran ke-import atau undefined
-            if (!client) {
-                console.log(`[DEBUG-8] 💀 FATAL ERROR: Objek 'client' WA tidak ditemukan (undefined)! Cek export di whatsappService.js`);
-            } else {
+            if (client) {
                 await client.sendMessage(whatsappId, whatsappMessage);
-                console.log(`[DEBUG-9] 🎉 BERHASIL: Pesan terkirim ke WA pelanggan!`);
+                console.log(`WA Notifikasi sukses dikirim ke ${customer.name} (${newStatus})`);
+            } else {
+                console.error('FATAL: Objek client WA tidak ditemukan!');
             }
         } catch (waError) {
-            console.error('[DEBUG-10] 💥 ERROR SAAT NGIRIM WA:', waError.message);
+            console.error('Gagal mengirim WhatsApp:', waError.message);
         }
-    } else {
-        console.log(`[DEBUG-11] ⚠️ SKIP NGIRIM WA: pesannya kosong atau nomornya ga kebaca Node.js!`);
     }
 
     return orderResult.rows[0];
