@@ -12,6 +12,12 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
         if (customerData.rows.length === 0) throw new Error('Customer not found');
         const customer = customerData.rows[0];
 
+        const storeData = await client.query('SELECT name AS store_name FROM stores WHERE id = $1', [storeId]);
+        let storeName = 'JaRiksa';
+        if (storeData.rows.length > 0) {
+            storeName = storeData.rows[0].store_name || storeData.rows[0].name;
+        }
+
         let discountAmount = 0;
         let promoId = null;
 
@@ -124,7 +130,8 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
             order: newOrder,
             items: orderItems,
             payment: midtransResponse,
-            customer: customer
+            customer: customer,
+            store_name: storeName
         };
     } catch (error) {
         await client.query('ROLLBACK');
@@ -184,9 +191,10 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     }
 
     const customerQuery = `
-        SELECT o.id as order_id, o.total_price, c.name, c.phone_number 
+        SELECT o.id as order_id, o.total_price, c.name, c.phone_number, s.store_name 
         FROM orders o 
         JOIN customers c ON o.customer_id = c.id 
+        JOIN stores s ON o.store_id = s.id
         WHERE o.id = $1
     `;
     const customerResult = await pool.query(customerQuery, [orderId]);
@@ -195,12 +203,19 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     let whatsappMessage = customMessage;
 
     if (!whatsappMessage) {
+        const formattedPrice = Number(customer.total_price).toLocaleString('id-ID');
+
         if (newStatus === 'Ready for Pickup') {
-            whatsappMessage = `Halo Kak ${customer.name},\n\nCucianmu dengan Order ID *#${orderId}* sudah SELESAI dan dikemas rapi nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${Number(customer.total_price).toLocaleString('id-ID')}*.\n\nTerima kasih sudah mencuci di JaRiksa! 🧺`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nCucianmu dengan Order ID *#${orderId}* sudah SELESAI dan dikemas rapi nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${formattedPrice}*\n\nTerima kasih sudah mencuci di *${customer.store_name}*! 🧺`;
+
         } else if (newStatus === 'Delayed') {
-            whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf, proses pengerjaan cucianmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat.\n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf, proses pengerjaan cucianmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat.\n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏\n\nSalam hangat,\n*${customer.store_name}*`;
+
         } else if (newStatus === 'Completed') {
-            whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Cucian dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan pakaianmu kepada JaRiksa. Sampai jumpa di cucian berikutnya! 👋😊`;
+            whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Cucian dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan pakaianmu kepada *${customer.store_name}*. Sampai jumpa di cucian berikutnya! 👋😊`;
+
+        } else if (newStatus === 'Pending Payment') {
+            whatsappMessage = `*Halo Kak ${customer.name}!* 👋\n\nTerima kasih telah mempercayakan cucian Anda kepada *${customer.store_name}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: *#${orderId}*\nTotal Tagihan: *Rp ${formattedPrice}*\nStatus Bayar: *Belum Lunas*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap dipickup.`;
         }
     }
 

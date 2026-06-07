@@ -30,7 +30,8 @@ const createNewOrder = async (req, res) => {
             result.customer.name,
             result.order.id,
             result.order.total_price,
-            finalPaymentOption
+            finalPaymentOption,
+            result.store_name
         );
 
         if (result.customer) delete result.customer;

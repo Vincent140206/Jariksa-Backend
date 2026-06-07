@@ -29,7 +29,7 @@ const initializeWhatsApp = () => {
     client.initialize();
 };
 
-const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption) => {
+const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption, storeName = 'JaRiksa') => {
     if (!isReady) {
         console.log('WhatsApp belum siap. Pesan ditunda.');
         return;
@@ -41,7 +41,7 @@ const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, p
             return;
         }
 
-        let cleanNumber = customerPhone.replace(/\D/g, '');
+        let cleanNumber = String(customerPhone).replace(/\D/g, '');
 
         if (cleanNumber.startsWith('0')) {
             cleanNumber = '62' + cleanNumber.slice(1);
@@ -51,7 +51,7 @@ const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, p
 
         const statusBayar = paymentOption === 'NOW' ? 'Lunas (QRIS)' : 'Belum Bayar (Bayar saat ambil)';
 
-        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan cucian Anda kepada Roketto Laundry.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${totalPrice.toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
+        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan cucian Anda kepada *${storeName}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${Number(totalPrice).toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
 
         await client.sendMessage(chatId, message);
         console.log(`Struk WA berhasil dikirim ke ${cleanNumber}`);
