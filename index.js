@@ -13,6 +13,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const paymentController = require('./controllers/paymentController');
 const promoRoutes = require('./routes/promoRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes')
+const webhookRoutes = require('./routes/webhookRoutes');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -28,6 +29,7 @@ app.use('/api/orders', orderRoutes);
 app.post('/api/payments/notification', paymentController.handleMidtransNotification);
 app.use('/api/promos', promoRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/webhook', webhookRoutes);
 
 app.listen(port, () => {
     console.log(`[LOCAL] Server JaRiksa berjalan di http://localhost:${port}`);

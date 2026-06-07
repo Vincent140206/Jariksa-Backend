@@ -224,4 +224,25 @@ const generatePaymentForExistingOrder = async (orderId, storeId) => {
     return midtransResponse;
 };
 
-module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateOrderStatus, generatePaymentForExistingOrder };
+const updateOrderStatusFromMidtrans = async (orderId, transactionStatus) => {
+    let newStatus = '';
+
+    if (transactionStatus === 'settlement' || transactionStatus === 'capture') {
+        newStatus = 'Processing';
+    }
+    else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
+        newStatus = 'Canceled';
+    }
+    else if (transactionStatus === 'pending') {
+        newStatus = 'Pending Payment';
+    }
+
+    if (newStatus) {
+        await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [newStatus, orderId]);
+        console.log(`Webhook: Order #${orderId} status diupdate jadi ${newStatus}`);
+    }
+
+    return newStatus;
+};
+
+module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateOrderStatus, generatePaymentForExistingOrder, updateOrderStatusFromMidtrans };
