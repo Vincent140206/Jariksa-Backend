@@ -16,12 +16,12 @@ const handleMidtransNotification = async (req, res) => {
             if (fraudStatus === 'challenge') {
                 newStatus = 'Payment Challenged';
             } else {
-                newStatus = 'Paid & Processing';
+                newStatus = 'Diproses';
             }
         } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
-            newStatus = 'Payment Failed';
+            newStatus = 'Dibatalkan';
         } else if (transactionStatus === 'pending') {
-            newStatus = 'Pending Payment';
+            newStatus = 'Menunggu Pembayaran';
         }
 
         await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [newStatus, actualOrderId]);

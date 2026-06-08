@@ -39,7 +39,7 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
                     const orderCountResult = await client.query(
                         `SELECT COUNT(*) FROM orders 
                          WHERE customer_id = $1 AND store_id = $2 
-                         AND status NOT IN ('Payment Failed', 'Canceled')`,
+                         AND status NOT IN ('Payment Failed', 'Dibatalkan', 'Selesai')`,
                         [customerId, storeId]
                     );
                     const pastOrders = parseInt(orderCountResult.rows[0].count);
