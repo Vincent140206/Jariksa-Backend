@@ -1,44 +1,64 @@
 const customerService = require('../services/customerService');
 
-const checkOrAddCustomer = async (req, res) => {
+const formatPhoneNumber = (phone) => {
+    if (!phone) return null;
+    let cleanNumber = phone.replace(/\D/g, '');
+    if (cleanNumber.startsWith('62')) {
+        cleanNumber = '0' + cleanNumber.slice(2);
+    }
+    return cleanNumber;
+};
+
+const checkCustomer = async (req, res) => {
     try {
         const storeId = req.store.store_id;
-        const { name, phone_number } = req.body;
+        const { phone_number } = req.body;
 
         if (!phone_number) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Nomor HP wajib diisi'
-            });
+            return res.status(400).json({ status: 'error', message: 'Nomor HP wajib diisi' });
         }
 
-        let cleanNumber = phone_number.replace(/\D/g, '');
-
-        if (cleanNumber.startsWith('62')) {
-            cleanNumber = '0' + cleanNumber.slice(2);
-        }
-
-        let customer = await customerService.findCustomerByPhone(storeId, cleanNumber);
+        const cleanNumber = formatPhoneNumber(phone_number);
+        const customer = await customerService.findCustomerByPhone(storeId, cleanNumber);
 
         if (customer) {
             return res.status(200).json({
                 status: 'success',
-                message: 'Customer found',
+                message: 'Customer ditemukan',
                 data: customer
             });
         } else {
-            const customerName = name || 'Pelanggan Baru';
-
-            customer = await customerService.createCustomer(storeId, customerName, cleanNumber);
-
-            return res.status(201).json({
-                status: 'success',
-                message: 'Customer auto-registered successfully',
-                data: customer
+            return res.status(404).json({
+                status: 'not_found',
+                message: 'Customer belum terdaftar.',
+                formatted_phone: cleanNumber
             });
         }
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+const addCustomer = async (req, res) => {
+    try {
+        const storeId = req.store.store_id;
+        const { name, phone_number } = req.body;
+
+        if (!name || !phone_number) {
+            return res.status(400).json({ status: 'error', message: 'Nama dan Nomor HP wajib diisi' });
+        }
+
+        const cleanNumber = formatPhoneNumber(phone_number);
+
+        const newCustomer = await customerService.createCustomer(storeId, name, cleanNumber);
+
+        res.status(201).json({
+            status: 'success',
+            message: 'Customer berhasil didaftarkan',
+            data: newCustomer
+        });
+    } catch (error) {
+        res.status(400).json({ status: 'error', message: error.message });
     }
 };
 
@@ -86,4 +106,4 @@ const getCustomerDetails = async (req, res) => {
     }
 };
 
-module.exports = { checkOrAddCustomer, getCustomers, getCustomersDashboard, getCustomerDetails };
+module.exports = { formatPhoneNumber, checkCustomer, addCustomer, getCustomers, getCustomersDashboard, getCustomerDetails };
