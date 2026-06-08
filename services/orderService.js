@@ -67,7 +67,7 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
 
         const finalTotalPrice = Math.max(0, totalPrice - discountAmount);
 
-        const initialStatus = paymentOption === 'NOW' ? 'Pending Payment' : 'Processing - Unpaid';
+        const initialStatus = paymentOption === 'NOW' ? 'Menunggu Pembayaran' : 'Diproses - Belum Dibayar';
 
         const orderResult = await client.query(
             `INSERT INTO orders (store_id, customer_id, total_price, status, promo_id, discount_amount, estimated_completion) 
@@ -205,16 +205,16 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     if (!whatsappMessage) {
         const formattedPrice = Number(customer.total_price).toLocaleString('id-ID');
 
-        if (newStatus === 'Ready for Pickup') {
+        if (newStatus === 'Siap Diambil') {
             whatsappMessage = `Halo Kak ${customer.name},\n\nPesananmu dengan Order ID *#${orderId}* sudah SELESAI nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${formattedPrice}*\n\nTerima kasih telah menggunakan layanan dari *${customer.store_name}*! 📦`;
 
-        } else if (newStatus === 'Delayed') {
+        } else if (newStatus === 'Terlambat') {
             whatsappMessage = `Halo Kak ${customer.name},\n\nKami memohon maaf, proses pengerjaan pesananmu dengan Order ID *#${orderId}* mengalami sedikit keterlambatan karena antrean yang cukup padat.\n\nKami akan berusaha menyelesaikannya secepat mungkin. Terima kasih atas pengertiannya. 🙏\n\nSalam hangat,\n*${customer.store_name}*`;
 
-        } else if (newStatus === 'Completed') {
+        } else if (newStatus === 'Selesai') {
             whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Pesanan dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan barangmu kepada *${customer.store_name}*. Sampai jumpa kembali! 👋😊`;
 
-        } else if (newStatus === 'Pending Payment') {
+        } else if (newStatus === 'Menunggu Pembayaran') {
             whatsappMessage = `*Halo Kak ${customer.name}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${customer.store_name}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: *#${orderId}*\nTotal Tagihan: *Rp ${formattedPrice}*\nStatus Bayar: *Belum Lunas*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
         }
     }
@@ -256,8 +256,8 @@ const generatePaymentForExistingOrder = async (orderId, storeId) => {
 
     const order = result.rows[0];
 
-    if (['Paid', 'Completed'].includes(order.status)) {
-        throw new Error('Pesanan ini sudah lunas, tidak perlu bayar lagi.');
+    if (['Selesai', 'Paid', 'Completed'].includes(order.status)) {
+        throw new Error('Pesanan ini sudah lunas atau selesai, tidak perlu bayar lagi.');
     }
 
     const midtransResponse = await paymentService.createPaymentToken(
@@ -267,33 +267,48 @@ const generatePaymentForExistingOrder = async (orderId, storeId) => {
         order.phone_number
     );
 
+    let nextStatus = order.status;
+    if (order.status === 'Diproses - Belum Dibayar') {
+        nextStatus = 'Menunggu Pembayaran';
+    }
+
     await pool.query(
         'UPDATE orders SET status = $1 WHERE id = $2',
-        ['Pending Payment', orderId]
+        [nextStatus, orderId]
     );
 
     return midtransResponse;
 };
 
 const updateOrderStatusFromMidtrans = async (orderId, transactionStatus) => {
+    const orderData = await pool.query('SELECT status FROM orders WHERE id = $1', [orderId]);
+    if (orderData.rows.length === 0) return null;
+
+    const currentStatus = orderData.rows[0].status;
     let newStatus = '';
 
     if (transactionStatus === 'settlement' || transactionStatus === 'capture') {
-        newStatus = 'Processing';
+        if (currentStatus === 'Siap Diambil') {
+            newStatus = 'Selesai';
+        } else {
+            newStatus = 'Diproses';
+        }
     }
     else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
-        newStatus = 'Canceled';
+        newStatus = 'Dibatalkan';
     }
     else if (transactionStatus === 'pending') {
-        newStatus = 'Pending Payment';
+        if (currentStatus !== 'Siap Diambil') {
+            newStatus = 'Menunggu Pembayaran';
+        }
     }
 
-    if (newStatus) {
+    if (newStatus && newStatus !== currentStatus) {
         await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [newStatus, orderId]);
-        console.log(`Webhook: Order #${orderId} status diupdate jadi ${newStatus}`);
+        console.log(`Webhook: Order #${orderId} status diupdate dari ${currentStatus} jadi ${newStatus}`);
     }
 
-    return newStatus;
+    return newStatus || currentStatus;
 };
 
 module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateStatusAndNotify, generatePaymentForExistingOrder, updateOrderStatusFromMidtrans };
