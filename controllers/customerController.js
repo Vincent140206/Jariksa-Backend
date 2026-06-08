@@ -1,42 +1,44 @@
 const customerService = require('../services/customerService');
 
-const checkCustomer = async (req, res) => {
+const checkOrAddCustomer = async (req, res) => {
     try {
         const storeId = req.store.store_id;
-        const { phone_number } = req.body;
+        const { name, phone_number } = req.body;
 
-        const customer = await customerService.findCustomerByPhone(storeId, phone_number);
+        if (!phone_number) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Nomor HP wajib diisi'
+            });
+        }
+
+        let cleanNumber = phone_number.replace(/\D/g, '');
+
+        if (cleanNumber.startsWith('62')) {
+            cleanNumber = '0' + cleanNumber.slice(2);
+        }
+
+        let customer = await customerService.findCustomerByPhone(storeId, cleanNumber);
 
         if (customer) {
-            res.status(200).json({
+            return res.status(200).json({
                 status: 'success',
                 message: 'Customer found',
                 data: customer
             });
         } else {
-            res.status(404).json({
-                status: 'not_found',
-                message: 'Customer not found. Please register as new customer.'
+            const customerName = name || 'Pelanggan Baru';
+
+            customer = await customerService.createCustomer(storeId, customerName, cleanNumber);
+
+            return res.status(201).json({
+                status: 'success',
+                message: 'Customer auto-registered successfully',
+                data: customer
             });
         }
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
-    }
-};
-
-const addCustomer = async (req, res) => {
-    try {
-        const storeId = req.store.store_id;
-        const { name, phone_number } = req.body;
-
-        const newCustomer = await customerService.createCustomer(storeId, name, phone_number);
-        res.status(201).json({
-            status: 'success',
-            message: 'Customer registered successfully',
-            data: newCustomer
-        });
-    } catch (error) {
-        res.status(400).json({ status: 'error', message: error.message });
     }
 };
 
@@ -84,4 +86,4 @@ const getCustomerDetails = async (req, res) => {
     }
 };
 
-module.exports = { checkCustomer, addCustomer, getCustomers, getCustomersDashboard, getCustomerDetails };
+module.exports = { checkOrAddCustomer, getCustomers, getCustomersDashboard, getCustomerDetails };

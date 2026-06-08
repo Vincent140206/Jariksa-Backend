@@ -3,8 +3,7 @@ const router = express.Router();
 const customerController = require('../controllers/customerController');
 const protect = require('../middlewares/authMiddleware');
 
-router.post('/check', protect, customerController.checkCustomer);
-router.post('/', protect, customerController.addCustomer);
+router.post('/check', protect, customerController.checkOrAddCustomer);
 router.get('/simple', protect, customerController.getCustomers);
 
 router.get('/', protect, customerController.getCustomersDashboard);
