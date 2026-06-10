@@ -304,7 +304,7 @@ function processVisionResult(result, filePath, expectedDomain) {
     console.log(`\n=== [${filePath}] DETECTED DOMAIN: ${domain.toUpperCase()} ===`);
 
     if (expectedDomain && domain !== 'general' && domain !== expectedDomain) {
-        console.log(`❌ Domain Mismatch: Expected ${expectedDomain}, detected ${domain}`);
+        console.log(`Domain Mismatch: Expected ${expectedDomain}, detected ${domain}`);
         return {
             file_path: filePath,
             item_status: 'REJECTED',
@@ -411,7 +411,7 @@ function processVisionResult(result, filePath, expectedDomain) {
  * @param {string} originalName 
  * @param {string} folder 
  */
-const uploadToGCS = async (buffer, originalName, folder = 'uploads') => {
+const uploadToGCS = async (buffer, originalName, folder = 'store-profiles') => {
     if (!GCS_BUCKET) throw new Error('GCS_BUCKET_NAME tidak diset di environment.');
 
     const ext = path.extname(originalName) || '.jpg';
@@ -463,7 +463,7 @@ const analyzeAndUploadImages = async (files) => {
     }
 
     const settledUploads = await Promise.allSettled(
-        files.map(file => uploadToGCS(file.buffer, file.originalname))
+        files.map(file => uploadToGCS(file.buffer, file.originalname, 'ai-scans'))
     );
 
     const results = visionResults.map((visionResult, i) => {
@@ -513,4 +513,4 @@ const analyzeAndUploadImages = async (files) => {
     return { results, summary };
 };
 
-module.exports = { analyzeAndUploadImages };
+module.exports = { analyzeAndUploadImages, uploadToGCS };

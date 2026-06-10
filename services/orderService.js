@@ -12,10 +12,10 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
         if (customerData.rows.length === 0) throw new Error('Customer not found');
         const customer = customerData.rows[0];
 
-        const storeData = await client.query('SELECT name AS store_name FROM stores WHERE id = $1', [storeId]);
+        const storeData = await client.query('SELECT store_name FROM stores WHERE id = $1', [storeId]);
         let storeName = 'JaRiksa';
         if (storeData.rows.length > 0) {
-            storeName = storeData.rows[0].store_name || storeData.rows[0].name;
+            storeName = storeData.rows[0].store_name;
         }
 
         let discountAmount = 0;

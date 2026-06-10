@@ -1,4 +1,5 @@
 const businessService = require('../services/businessService');
+const { uploadToGCS } = require('../services/visionService');
 
 const createCategory = async (req, res) => {
     try {
@@ -45,4 +46,26 @@ const fetchProfile = async (req, res) => {
     }
 }
 
-module.exports = { createCategory, createService, fetchMenu, fetchProfile };
+const uploadStorePicture = async (req, res) => {
+    try {
+        const storeId = req.store.store_id;
+
+        if (!req.file) {
+            return res.status(400).json({ status: 'error', message: 'Silakan pilih file foto.' });
+        }
+
+        const uploadResult = await uploadToGCS(req.file.buffer, req.file.originalname);
+
+        const updatedStore = await businessService.updateStoreProfilePicture(storeId, uploadResult.publicUrl);
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Foto profil diperbarui.',
+            data: updatedStore
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+module.exports = { createCategory, createService, fetchMenu, fetchProfile, uploadStorePicture };

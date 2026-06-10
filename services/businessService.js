@@ -56,6 +56,7 @@ const fetchProfile = async (storeId) => {
             s.id,
             s.store_name,
             s.email,
+            s.profile_picture,
             s.created_at,
             
             COALESCE((
@@ -87,4 +88,10 @@ const fetchProfile = async (storeId) => {
     return profileData;
 };
 
-module.exports = { addCategory, getCategories, addService, getStoreMenu, fetchProfile };
+const updateStoreProfilePicture = async (storeId, imageUrl) => {
+    const query = 'UPDATE stores SET profile_picture = $1 WHERE id = $2 RETURNING id, store_name, profile_picture';
+    const result = await pool.query(query, [imageUrl, storeId]);
+    return result.rows[0];
+};
+
+module.exports = { addCategory, getCategories, addService, getStoreMenu, fetchProfile, updateStoreProfilePicture };
