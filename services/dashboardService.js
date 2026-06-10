@@ -6,7 +6,7 @@ const getDashboardData = async (storeId) => {
             COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN total_price ELSE 0 END), 0) AS today_income,
             COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE - INTERVAL '1 day' THEN total_price ELSE 0 END), 0) AS yesterday_income
         FROM orders 
-        WHERE store_id = $1 AND status NOT IN ('Payment Failed', 'Canceled')
+        WHERE store_id = $1 AND status NOT IN ('Canceled', 'Batal', 'Payment Failed')
     `;
     const incomeResult = await pool.query(incomeQuery, [storeId]);
     const { today_income, yesterday_income } = incomeResult.rows[0];
@@ -21,23 +21,31 @@ const getDashboardData = async (storeId) => {
     const statusQuery = `
         SELECT status, COUNT(*) as count 
         FROM orders 
-        WHERE store_id = $1 AND status NOT IN ('Canceled')
+        WHERE store_id = $1 AND status NOT IN ('Canceled', 'Batal', 'Payment Failed')
         GROUP BY status
     `;
     const statusResult = await pool.query(statusQuery, [storeId]);
 
     let operasional = { masuk: 0, diproses: 0, selesai: 0 };
     statusResult.rows.forEach(row => {
-        if (row.status === 'Pending Payment') operasional.masuk += parseInt(row.count);
-        if (row.status === 'Paid & Processing' || row.status === 'Processing') operasional.diproses += parseInt(row.count);
-        if (row.status === 'Ready for Pickup' || row.status === 'Completed') operasional.selesai += parseInt(row.count);
+        const count = parseInt(row.count);
+
+        if (row.status === 'Menunggu Pembayaran' || row.status === 'Diproses - Belum Bayar') {
+            operasional.masuk += count;
+        }
+        if (row.status === 'Diproses' || row.status === 'Terlambat') {
+            operasional.diproses += count;
+        }
+        if (row.status === 'Siap Diambil' || row.status === 'Selesai') {
+            operasional.selesai += count;
+        }
     });
 
     const lateQuery = `
         SELECT COUNT(*) as count 
         FROM orders 
         WHERE store_id = $1 
-        AND status NOT IN ('Ready for Pickup', 'Completed', 'Canceled')
+        AND status IN ('Diproses', 'Diproses - Belum Bayar', 'Menunggu Pembayaran')
         AND estimated_completion < CURRENT_TIMESTAMP
     `;
     const lateResult = await pool.query(lateQuery, [storeId]);
