@@ -15,7 +15,7 @@ router.get('/menu', protect, businessController.fetchMenu);
 router.get('/', protect, businessController.fetchProfile);
 router.put(
     '/profile/picture',
-    authenticateMiddleware,
+    protect,
     upload.single('profile_picture'),
     businessController.uploadStorePicture
 );
