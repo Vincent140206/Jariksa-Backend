@@ -6,7 +6,7 @@ const getDashboardData = async (storeId) => {
             COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN total_price ELSE 0 END), 0) AS today_income,
             COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE - INTERVAL '1 day' THEN total_price ELSE 0 END), 0) AS yesterday_income
         FROM orders 
-        WHERE store_id = $1 AND status NOT IN ('Canceled', 'Batal', 'Payment Failed')
+        WHERE store_id = $1 AND status NOT IN ('Payment Failed', 'Canceled', 'Batal')
     `;
     const incomeResult = await pool.query(incomeQuery, [storeId]);
     const { today_income, yesterday_income } = incomeResult.rows[0];
@@ -27,17 +27,36 @@ const getDashboardData = async (storeId) => {
     const statusResult = await pool.query(statusQuery, [storeId]);
 
     let operasional = { masuk: 0, diproses: 0, selesai: 0 };
+
     statusResult.rows.forEach(row => {
         const count = parseInt(row.count);
 
-        if (row.status === 'Menunggu Pembayaran' || row.status === 'Diproses - Belum Bayar') {
-            operasional.masuk += count;
-        }
-        if (row.status === 'Diproses' || row.status === 'Terlambat') {
-            operasional.diproses += count;
-        }
-        if (row.status === 'Siap Diambil' || row.status === 'Selesai') {
-            operasional.selesai += count;
+        switch (row.status) {
+            case 'Menunggu Pembayaran':
+            case 'Pending Payment':
+                operasional.masuk += count;
+                break;
+
+            case 'Diproses':
+            case 'Diproses - Belum Bayar':
+            case 'Processing':
+            case 'Processing - Unpaid':
+            case 'Paid & Processing':
+            case 'Terlambat':
+            case 'Delayed':
+                operasional.diproses += count;
+                break;
+
+            // Kelompok Selesai
+            case 'Siap Diambil':
+            case 'Selesai':
+            case 'Ready for Pickup':
+            case 'Completed':
+                operasional.selesai += count;
+                break;
+
+            default:
+                break;
         }
     });
 
@@ -45,15 +64,26 @@ const getDashboardData = async (storeId) => {
         SELECT COUNT(*) as count 
         FROM orders 
         WHERE store_id = $1 
-        AND status IN ('Diproses', 'Diproses - Belum Bayar', 'Menunggu Pembayaran')
+        AND status IN ('Diproses', 'Diproses - Belum Bayar', 'Menunggu Pembayaran', 'Terlambat', 'Processing', 'Processing - Unpaid', 'Pending Payment', 'Paid & Processing', 'Delayed')
         AND estimated_completion < CURRENT_TIMESTAMP
     `;
     const lateResult = await pool.query(lateQuery, [storeId]);
     const lateCount = parseInt(lateResult.rows[0].count);
 
     const recentQuery = `
-        SELECT o.id, o.status, o.created_at, c.name as customer_name,
-               (SELECT s.service_name FROM order_items oi JOIN services s ON oi.service_id = s.id WHERE oi.order_id = o.id LIMIT 1) as main_service
+        SELECT o.id, 
+            CASE o.status
+                WHEN 'Pending Payment' THEN 'Menunggu Pembayaran'
+                WHEN 'Processing - Unpaid' THEN 'Diproses - Belum Bayar'
+                WHEN 'Processing' THEN 'Diproses'
+                WHEN 'Paid & Processing' THEN 'Diproses'
+                WHEN 'Ready for Pickup' THEN 'Siap Diambil'
+                WHEN 'Completed' THEN 'Selesai'
+                WHEN 'Delayed' THEN 'Terlambat'
+                ELSE o.status
+            END as status, 
+            o.created_at, c.name as customer_name,
+            (SELECT s.service_name FROM order_items oi JOIN services s ON oi.service_id = s.id WHERE oi.order_id = o.id LIMIT 1) as main_service
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
         WHERE o.store_id = $1
