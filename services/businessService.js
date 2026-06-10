@@ -53,15 +53,38 @@ const getStoreMenu = async (storeId) => {
 const fetchProfile = async (storeId) => {
     const query = `
         SELECT 
-            id,
-            store_name,
-            email,
-            created_at
-        FROM stores
-        WHERE id = $1
+            s.id,
+            s.store_name,
+            s.email,
+            s.created_at,
+            
+            COALESCE((
+                SELECT SUM(total_price) 
+                FROM orders 
+                WHERE store_id = s.id 
+                AND status NOT IN ('Canceled', 'Batal', 'Payment Failed')
+            ), 0) AS total_omzet,
+
+            COALESCE((
+                SELECT COUNT(id) 
+                FROM orders 
+                WHERE store_id = s.id 
+                AND status NOT IN ('Canceled', 'Batal', 'Payment Failed')
+            ), 0) AS total_order
+
+        FROM stores s
+        WHERE s.id = $1
     `;
+
     const result = await pool.query(query, [storeId]);
-    return result.rows[0];
+
+    const profileData = result.rows[0];
+    if (profileData) {
+        profileData.total_omzet = parseInt(profileData.total_omzet);
+        profileData.total_order = parseInt(profileData.total_order);
+    }
+
+    return profileData;
 };
 
 module.exports = { addCategory, getCategories, addService, getStoreMenu, fetchProfile };
