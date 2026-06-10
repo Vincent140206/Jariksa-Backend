@@ -42,4 +42,15 @@ const updatePromoStatus = async (req, res) => {
     }
 };
 
+// const sendPromo = async (req, res) => {
+//     try {
+//         const storeId = req.store.store_id;
+//         const customerId = req.params.customerId;
+//         const promoId = req.params.promoId;
+
+//         const sendPromo = await promoService.sendPromo(storeId, customerId, promoId);
+
+//         res.status(200).json({ status: 'success', message })
+//     }
+// }
 module.exports = { addPromo, getMyPromos, updatePromoStatus };

@@ -50,4 +50,18 @@ const getStoreMenu = async (storeId) => {
     return menu.rows;
 };
 
-module.exports = { addCategory, getCategories, addService, getStoreMenu };
+const fetchProfile = async (storeId) => {
+    const query = `
+        SELECT 
+            id,
+            store_name,
+            email,
+            created_at
+        FROM stores
+        WHERE id = $1
+    `;
+    const result = await pool.query(query, [storeId]);
+    return result.rows[0];
+};
+
+module.exports = { addCategory, getCategories, addService, getStoreMenu, fetchProfile };

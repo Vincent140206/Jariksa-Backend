@@ -63,4 +63,10 @@ const togglePromoStatus = async (promoId, storeId, isActive) => {
     return result.rows[0];
 };
 
+// const promoService = async (storeId, customerId, promoId) => {
+//     const query = `
+//         SELECT 
+//     `
+// }
+
 module.exports = { createNewPromo, getPromosByStore, togglePromoStatus };

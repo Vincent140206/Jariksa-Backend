@@ -34,4 +34,15 @@ const fetchMenu = async (req, res) => {
     }
 };
 
-module.exports = { createCategory, createService, fetchMenu };
+const fetchProfile = async (req, res) => {
+    try {
+        const storeId = req.store.store_id;
+        const result = await businessService.fetchProfile(storeId);
+
+        res.status(200).json({ status: 'success', data: result });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+}
+
+module.exports = { createCategory, createService, fetchMenu, fetchProfile };
