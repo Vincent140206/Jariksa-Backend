@@ -3,6 +3,11 @@ const { Storage } = require('@google-cloud/storage');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
+const geminiClient = process.env.GEMINI_API_KEY
+    ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    : null;
 
 const GCS_BUCKET = process.env.GCS_BUCKET_NAME;
 const MAX_BATCH_SIZE = 5;
@@ -23,7 +28,7 @@ const domainSignatures = {
             'button', 'zipper', 'collar', 'sock', 'glove', 'hat', 'cap', 'sweater',
             'blouse', 'skirt', 'scarf', 'hoodie', 'uniform', 'garment', 'wear', 'fashion',
         ],
-        minScore: 0.7,
+        minScore: 0.5,
     },
     elektronik: {
         keywords: [
@@ -89,7 +94,7 @@ function detectDomain(labels) {
 }
 
 function checkIfRandomPhoto(labels, domain) {
-    const topLabels = labels.slice(0, 8); // fokus di label teratas (paling dominan)
+    const topLabels = labels.slice(0, 8);
 
     let irrelevantScore = 0;
     let irrelevantHits = [];
@@ -149,7 +154,7 @@ const damageDict = {
         },
         {
             index: 2, kategori: 'Noda/Kotoran',
-            keywords: ['stain', 'spot', 'spill', 'ink', 'mud', 'grease', 'soiled', 'dirty', 'discolored', 'discoloration'],
+            keywords: ['stain', 'spot', 'spill', 'ink', 'mud', 'grease', 'soiled', 'dirty', 'discolored', 'discoloration', 'smudge', 'blot', 'blemish', 'mark', 'soil', 'filth', 'grime', 'tarnish', 'contamination'],
         },
         {
             index: 3, kategori: 'Luntur/Pudar',
@@ -199,15 +204,15 @@ const damageDict = {
     general: [
         {
             index: 1, kategori: 'Rusak Fisik (Umum)',
-            keywords: ['broken', 'damaged', 'destroyed', 'cracked', 'dented', 'scratched', 'chipped', 'fractured', 'bent', 'deformed'],
+            keywords: ['broken', 'damaged', 'destroyed', 'cracked', 'dented', 'scratched', 'chipped', 'fractured', 'bent', 'deformed']
         },
         {
             index: 2, kategori: 'Noda/Kotor',
-            keywords: ['stained', 'dirty', 'spotted', 'soiled', 'discolored', 'marked'],
+            keywords: ['stained', 'dirty', 'spotted', 'soiled', 'discolored', 'marked', 'stain', 'spot', 'smudge', 'blemish', 'grime', 'soil', 'filth', 'dye']
         },
         {
             index: 3, kategori: 'Aus/Lecet',
-            keywords: ['worn', 'faded', 'scuffed', 'abraded', 'eroded', 'peeled'],
+            keywords: ['worn', 'faded', 'scuffed', 'abraded', 'eroded', 'peeled']
         },
     ],
 };
@@ -218,12 +223,14 @@ function matchesKeyword(labelName, keyword) {
 
 function analyzeColorAnomalies(colors) {
     const anomalies = [];
+    const stainHits = [];
+    const dirtHits = [];
 
     for (const c of colors) {
         const { red: r = 0, green: g = 0, blue: b = 0 } = c.color || {};
         const pct = c.pixelFraction || 0;
 
-        if (pct < 0.08) continue;
+        if (pct < 0.003) continue;
 
         if (r > 140 && g < 80 && b < 50 && r > g * 2.0 && r > b * 3.0) {
             anomalies.push({ type: 'rust_corrosion', pixelPct: pct, rgb: [r, g, b] });
@@ -231,9 +238,45 @@ function analyzeColorAnomalies(colors) {
         else if (r < 40 && g < 40 && b < 40 && pct > 0.10) {
             anomalies.push({ type: 'burn_char', pixelPct: pct, rgb: [r, g, b] });
         }
-        else if (r > 120 && r < 180 && g > 50 && g < 100 && b < 50 && r > b * 3.0 && pct > 0.10) {
-            anomalies.push({ type: 'stain_discolor', pixelPct: pct, rgb: [r, g, b] });
+        else if (r > 100 && g < 120 && b < 80 && r > g * 1.5 && r > b * 1.8) {
+            stainHits.push({ pct, rgb: [r, g, b] });
         }
+        else if (
+            r > 40 && r < 150 &&
+            g > 20 && g < 120 &&
+            b > 10 && b < 100 &&
+            Math.abs(r - g) < 60 &&
+            r >= g && g >= b * 0.7 &&
+            pct > 0.005
+        ) {
+            dirtHits.push({ pct, rgb: [r, g, b] });
+        }
+        else if (
+            r > 180 && g > 160 && b > 100 && b < 190 &&
+            r > b * 1.15 && g > b * 1.1 &&
+            r - b > 30 &&
+            pct > 0.01
+        ) {
+            dirtHits.push({ pct, rgb: [r, g, b] });
+        }
+    }
+
+    const totalStainPct = stainHits.reduce((sum, h) => sum + h.pct, 0);
+    if (stainHits.length >= 2 || totalStainPct > 0.015) {
+        anomalies.push({
+            type: 'stain_discolor',
+            pixelPct: totalStainPct,
+            rgb: stainHits[0].rgb,
+        });
+    }
+
+    const totalDirtPct = dirtHits.reduce((sum, h) => sum + h.pct, 0);
+    if (dirtHits.length >= 3 || totalDirtPct > 0.08) {
+        anomalies.push({
+            type: 'stain_discolor',
+            pixelPct: totalDirtPct,
+            rgb: dirtHits[0]?.rgb,
+        });
     }
 
     return anomalies;
@@ -282,7 +325,14 @@ function processVisionResult(result, filePath, expectedDomain) {
     const labels = result.labelAnnotations || [];
     const colors = result.imagePropertiesAnnotation?.dominantColors?.colors || [];
 
+    const objects = result.localizedObjectAnnotations || [];
+
     const { isRandom, reason } = checkIfRandomPhoto(labels, null);
+    console.log(`[DEBUG objects] ${filePath}:`, objects.map(o =>
+        `${o.name}(${o.score.toFixed(2)})`).join(', '));
+    console.log(`[DEBUG colors] ${filePath}:`, colors.map(c =>
+        `RGB(${c.color?.red || 0},${c.color?.green || 0},${c.color?.blue || 0}) pct=${(c.pixelFraction * 100).toFixed(1)}%`
+    ).join(' | '));
     if (isRandom) {
         console.log(`\n[${filePath}] FOTO TIDAK RELEVAN: ${reason}`);
         return {
@@ -326,7 +376,7 @@ function processVisionResult(result, filePath, expectedDomain) {
 
     for (const label of labels) {
         const name = label.description.toLowerCase();
-        if (label.score < 0.70) continue;
+        if (label.score < 0.3) continue;
 
         for (const category of activeDict) {
             if (seenCategories.has(category.index)) continue;
@@ -340,7 +390,7 @@ function processVisionResult(result, filePath, expectedDomain) {
                     confidence: label.score,
                     kategori_kerusakan: category.kategori,
                     damage_index: category.index,
-                    isCritical: label.score >= 0.88,
+                    isCritical: label.score >= 0.68,
                 });
                 break;
             }
@@ -437,6 +487,58 @@ const uploadToGCS = async (buffer, originalName, folder = 'store-profiles') => {
  * @param {Express.Multer.File[]} files
  * @returns {Promise<{ results: Array, summary: object }>}
  */
+
+async function geminiDoubleCheck(fileBuffer, originalName, domain) {
+    if (!geminiClient) {
+        console.log('[Gemini] API key tidak ada, skip fallback.');
+        return null;
+    }
+
+    try {
+        const model = geminiClient.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+        const imagePart = {
+            inlineData: {
+                data: fileBuffer.toString('base64'),
+                mimeType: 'image/jpeg',
+            },
+        };
+
+        const domainContext = {
+            laundry: 'pakaian atau tekstil',
+            elektronik: 'perangkat elektronik',
+            otomotif: 'kendaraan atau komponen otomotif',
+            general: 'barang umum',
+        };
+
+        const prompt = `Kamu adalah sistem deteksi kerusakan barang untuk layanan servis.
+        Analisa gambar ini yang berisi ${domainContext[domain] || 'barang'}.
+
+        Cari tanda-tanda kerusakan seperti: noda, kotoran, robek, retak, goresan, karat, atau kerusakan lainnya.
+        Fokus pada kondisi fisik barang, abaikan orang atau background.
+
+        Jawab HANYA dengan format JSON berikut, tanpa teks lain:
+        {
+        "has_damage": true/false,
+        "damages": [
+            { "kategori": "nama kategori kerusakan", "deskripsi": "penjelasan singkat", "severity": "low/medium/high" }
+        ],
+        "confidence": 0.0-1.0
+        }`;
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const text = result.response.text().replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(text);
+
+        console.log(`[Gemini] ${originalName}:`, JSON.stringify(parsed));
+        return parsed;
+
+    } catch (err) {
+        console.error(`[Gemini] Error untuk ${originalName}:`, err.message);
+        return null;
+    }
+}
+
 const analyzeAndUploadImages = async (files) => {
     if (!Array.isArray(files) || files.length === 0) {
         throw new Error('Tidak ada file yang dikirim.');
