@@ -29,7 +29,7 @@ const initializeWhatsApp = () => {
     client.initialize();
 };
 
-const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption, storeName = 'JaRiksa') => {
+const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption, storeName = 'JaRiksa', estimatedCompletion = null) => {
     if (!isReady) {
         console.log('WhatsApp belum siap. Pesan ditunda.');
         return;
@@ -51,7 +51,13 @@ const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, p
 
         const statusBayar = paymentOption === 'NOW' ? 'Lunas (QRIS)' : 'Belum Bayar (Bayar saat ambil)';
 
-        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${storeName}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${Number(totalPrice).toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
+        let formattedETA = '3 Hari dari sekarang';
+        if (estimatedCompletion) {
+            const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            formattedETA = new Date(estimatedCompletion).toLocaleDateString('id-ID', dateOptions);
+        }
+
+        const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${storeName}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${Number(totalPrice).toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: *${formattedETA}*.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
 
         await client.sendMessage(chatId, message);
         console.log(`Struk WA berhasil dikirim ke ${cleanNumber}`);

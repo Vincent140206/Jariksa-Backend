@@ -69,10 +69,25 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
 
         const initialStatus = paymentOption === 'NOW' ? 'Menunggu Pembayaran' : 'Diproses - Belum Dibayar';
 
+        const serviceIds = items.map(item => parseInt(item.service_id));
+        const durationData = await client.query(
+            'SELECT MAX(duration_hours) as max_duration FROM services WHERE id = ANY($1::int[])',
+            [serviceIds]
+        );
+        const maxDurationHours = durationData.rows[0].max_duration || 72;
+
         const orderResult = await client.query(
             `INSERT INTO orders (store_id, customer_id, total_price, status, promo_id, discount_amount, estimated_completion) 
-             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP + INTERVAL '3 days') RETURNING *`,
-            [storeId, customerId, finalTotalPrice, initialStatus, promoId, discountAmount]
+             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP + interval '1 hour' * $7) RETURNING *`,
+            [
+                storeId,
+                customerId,
+                finalTotalPrice,
+                initialStatus,
+                promoId,
+                discountAmount,
+                maxDurationHours
+            ]
         );
         const newOrder = orderResult.rows[0];
 
@@ -191,7 +206,7 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     }
 
     const customerQuery = `
-        SELECT o.id as order_id, o.total_price, c.name, c.phone_number, s.store_name 
+        SELECT o.id as order_id, o.total_price, o.estimated_completion, c.name, c.phone_number, s.store_name 
         FROM orders o 
         JOIN customers c ON o.customer_id = c.id 
         JOIN stores s ON o.store_id = s.id
@@ -205,6 +220,9 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
     if (!whatsappMessage) {
         const formattedPrice = Number(customer.total_price).toLocaleString('id-ID');
 
+        const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+        const formattedETA = new Date(customer.estimated_completion).toLocaleDateString('id-ID', dateOptions);
+
         if (newStatus === 'Siap Diambil') {
             whatsappMessage = `Halo Kak ${customer.name},\n\nPesananmu dengan Order ID *#${orderId}* sudah SELESAI nih! ✨\nSilakan datang ke outlet untuk pengambilan ya.\n\nTotal Tagihan: *Rp ${formattedPrice}*\n\nTerima kasih telah menggunakan layanan dari *${customer.store_name}*! 📦`;
 
@@ -215,7 +233,7 @@ const updateStatusAndNotify = async (orderId, newStatus, customMessage = null) =
             whatsappMessage = `Halo Kak ${customer.name},\n\nHore! Pesanan dengan Order ID *#${orderId}* sudah sukses diambil.\n\nTerima kasih banyak telah memercayakan barangmu kepada *${customer.store_name}*. Sampai jumpa kembali! 👋😊`;
 
         } else if (newStatus === 'Menunggu Pembayaran') {
-            whatsappMessage = `*Halo Kak ${customer.name}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${customer.store_name}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: *#${orderId}*\nTotal Tagihan: *Rp ${formattedPrice}*\nStatus Bayar: *Belum Lunas*\nEstimasi Selesai: 3 Hari dari sekarang.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
+            whatsappMessage = `*Halo Kak ${customer.name}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${customer.store_name}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: *#${orderId}*\nTotal Tagihan: *Rp ${formattedPrice}*\nStatus Bayar: *Belum Lunas*\nEstimasi Selesai: *${formattedETA}*.\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
         }
     }
 
