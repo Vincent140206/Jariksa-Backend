@@ -15,9 +15,16 @@ const createCategory = async (req, res) => {
 
 const createService = async (req, res) => {
     try {
-        const { category_id, service_name, description, price, unit } = req.body;
+        const { category_id, service_name, description, price, unit, duration_hours } = req.body;
 
-        const result = await businessService.addService(category_id, service_name, description, price, unit);
+        const result = await businessService.addService(
+            category_id,
+            service_name,
+            description,
+            price,
+            unit,
+            duration_hours
+        );
         res.status(201).json({ status: 'success', message: 'Service added', data: result });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });

@@ -16,10 +16,10 @@ const getCategories = async (storeId) => {
     return categories.rows;
 };
 
-const addService = async (categoryId, serviceName, description, price, unit) => {
+const addService = async (categoryId, serviceName, description, price, unit, durationHours = 72) => {
     const newService = await pool.query(
-        'INSERT INTO services (category_id, service_name, description, price, unit) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-        [categoryId, serviceName, description, price, unit]
+        'INSERT INTO services (category_id, service_name, description, price, unit, duration_hours) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+        [categoryId, serviceName, description, price, unit, durationHours]
     );
     return newService.rows[0];
 };
@@ -36,7 +36,8 @@ const getStoreMenu = async (storeId) => {
                         'service_name', s.service_name,
                         'description', s.description,
                         'price', s.price,
-                        'unit', s.unit
+                        'unit', s.unit,
+                        'duration_hours', s.duration_hours
                     )
                 ) FILTER (WHERE s.id IS NOT NULL), '[]'
             ) AS services
