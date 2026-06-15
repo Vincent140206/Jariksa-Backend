@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const crypto = require('crypto');
 
 const createNewPromo = async (storeId, promoData) => {
     const {
@@ -13,9 +14,10 @@ const createNewPromo = async (storeId, promoData) => {
         INSERT INTO promos (
             store_id, promo_name, promo_code, description, 
             requirement_type, requirement_value, reward_type, 
-            reward_value, free_service_id, max_discount
+            reward_value, free_service_id, max_discount,
+            customer_id, is_used
         ) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NULL, false) 
         RETURNING *
     `;
 
@@ -38,9 +40,13 @@ const createNewPromo = async (storeId, promoData) => {
 
 const getPromosByStore = async (storeId) => {
     const query = `
-        SELECT p.*, s.service_name AS free_service_name 
+        SELECT 
+            p.*, 
+            s.service_name AS free_service_name,
+            c.name AS target_customer_name
         FROM promos p
         LEFT JOIN services s ON p.free_service_id = s.id
+        LEFT JOIN customers c ON p.customer_id = c.id
         WHERE p.store_id = $1
         ORDER BY p.created_at DESC
     `;
@@ -63,10 +69,71 @@ const togglePromoStatus = async (promoId, storeId, isActive) => {
     return result.rows[0];
 };
 
-// const promoService = async (storeId, customerId, promoId) => {
-//     const query = `
-//         SELECT 
-//     `
-// }
+const generateTargetedPromo = async (storeId, customerId, customerName, rewardValue) => {
+    const randomStr = crypto.randomBytes(2).toString('hex').toUpperCase();
+    const cleanName = customerName.replace(/\s+/g, '').toUpperCase().slice(0, 5);
+    const promoCode = `KANGEN-${cleanName}-${randomStr}`;
 
-module.exports = { createNewPromo, getPromosByStore, togglePromoStatus };
+    const query = `
+        INSERT INTO promos (
+            store_id, promo_name, promo_code, description, 
+            requirement_type, requirement_value, reward_type, 
+            reward_value, is_active, customer_id, is_used
+        ) VALUES ($1, $2, $3, $4, 'NONE', 0, 'FIXED', $5, true, $6, false) 
+        RETURNING *
+    `;
+
+    const result = await pool.query(query, [
+        storeId,
+        `Promo Spesial Kembali untuk ${customerName}`,
+        promoCode,
+        'Diskon khusus pelanggan setia kami yang sudah lama tidak mencuci.',
+        rewardValue,
+        customerId
+    ]);
+
+    return result.rows[0];
+};
+
+const validatePromoCode = async (storeId, customerId, promoCode, totalPrice) => {
+    const promoQuery = `SELECT * FROM promos WHERE promo_code = $1 AND store_id = $2 AND is_active = true`;
+    const promoResult = await pool.query(promoQuery, [promoCode.trim().toUpperCase(), storeId]);
+
+    if (promoResult.rows.length === 0) {
+        throw new Error('Kode promo tidak valid atau tidak aktif.');
+    }
+
+    const promo = promoResult.rows[0];
+
+    if (promo.customer_id !== null) {
+        if (promo.customer_id !== parseInt(customerId)) {
+            throw new Error('Maaf, kode promo ini eksklusif dan bukan milik Anda.');
+        }
+        if (promo.is_used === true) {
+            throw new Error('Kode promo ini sudah hangus karena pernah Anda gunakan.');
+        }
+    } else {
+        if (promo.requirement_type === 'MIN_SPEND' && totalPrice < promo.requirement_value) {
+            throw new Error(`Minimal transaksi Rp${promo.requirement_value.toLocaleString('id-ID')}`);
+        }
+    }
+
+    let discountAmount = 0;
+    if (promo.reward_type === 'FIXED') {
+        discountAmount = promo.reward_value;
+    } else if (promo.reward_type === 'PERCENT') {
+        discountAmount = (totalPrice * promo.reward_value) / 100;
+        if (promo.max_discount && discountAmount > promo.max_discount) {
+            discountAmount = promo.max_discount;
+        }
+    }
+
+    return {
+        promo_id: promo.id,
+        promo_code: promo.promo_code,
+        discount_amount: discountAmount,
+        final_total_price: Math.max(0, totalPrice - discountAmount)
+    };
+};
+
+module.exports = { createNewPromo, getPromosByStore, togglePromoStatus, generateTargetedPromo, validatePromoCode };
