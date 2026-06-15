@@ -88,4 +88,30 @@ const sendTestMessage = async (phoneNumber, message) => {
     }
 };
 
-module.exports = { initializeWhatsApp, sendReceiptWA, sendTestMessage, client };
+const sendPlainMessage = async (customerPhone, messageText) => {
+    if (!isReady) {
+        console.log('WhatsApp belum siap. Pesan ditunda.');
+        return;
+    }
+
+    try {
+        if (!customerPhone) {
+            console.log('Gagal kirim WA: Nomor HP kosong');
+            return;
+        }
+
+        let cleanNumber = String(customerPhone).replace(/\D/g, '');
+        if (cleanNumber.startsWith('0')) {
+            cleanNumber = '62' + cleanNumber.slice(1);
+        }
+
+        const chatId = `${cleanNumber}@c.us`;
+
+        await client.sendMessage(chatId, messageText);
+        console.log(`Pesan WA (Promo/Notif) berhasil dikirim ke ${cleanNumber}`);
+    } catch (error) {
+        console.error('Gagal mengirim pesan WA polosan:', error.message);
+    }
+};
+
+module.exports = { initializeWhatsApp, sendReceiptWA, sendTestMessage, client, sendPlainMessage };

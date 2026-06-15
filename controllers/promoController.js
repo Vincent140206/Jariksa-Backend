@@ -102,14 +102,9 @@ const sendTargetedPromo = async (req, res) => {
 
         const newPromo = await promoService.generateTargetedPromo(storeId, customer_id, customerName, reward_value);
 
-        let formattedPhone = String(customerPhone).replace(/[^0-9]/g, '');
-        if (formattedPhone.startsWith('0')) {
-            formattedPhone = '62' + formattedPhone.slice(1);
-        }
+        const waMessage = `Halo kak ${customerName}!\n\nKami kangen kakak memakai jasa di toko kami. Ini ada diskon spesial Rp${reward_value.toLocaleString('id-ID')} khusus buat kakak.\n\nGunakan kode promo: *${newPromo.promo_code}*\n\nKode ini cuma bisa dipakai 1x ya kak. Ditunggu kedatangannya!`;
 
-        const waMessage = `Halo kak ${customerName}!\n\nKami kangen kakak nyuci di toko kami. Ini ada diskon spesial Rp${reward_value.toLocaleString('id-ID')} khusus buat kakak.\n\nGunakan kode promo: *${newPromo.promo_code}*\n\nKode ini cuma bisa dipakai 1x ya kak. Ditunggu kedatangannya!`;
-
-        await whatsappService.sendReceiptWA(`${formattedPhone}@c.us`, waMessage);
+        await whatsappService.sendPlainMessage(customerPhone, waMessage);
 
         res.status(201).json({
             status: 'success',
