@@ -121,4 +121,23 @@ const changeStatus = async (req, res) => {
     }
 };
 
-module.exports = { createNewOrder, getAllOrders, getOrderById, generateOrderPayment, changeStatus };
+const simulateETA = async (req, res) => {
+    try {
+        const { store_id, service_id, quantity } = req.body;
+
+        if (!store_id || !service_id || !quantity) {
+            return res.status(400).json({ status: 'error', message: 'Data tidak lengkap' });
+        }
+
+        const etaResult = await calculatePredictiveETA(store_id, service_id, quantity);
+
+        res.status(200).json({
+            status: 'success',
+            data: etaResult
+        });
+    } catch (error) {
+        res.status(500).json({ status: 'error', message: error.message });
+    }
+};
+
+module.exports = { createNewOrder, getAllOrders, getOrderById, generateOrderPayment, changeStatus, simulateETA };

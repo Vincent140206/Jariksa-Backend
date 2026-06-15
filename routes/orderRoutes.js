@@ -8,5 +8,6 @@ router.get('/', protect, orderController.getAllOrders);
 router.get('/:id', protect, orderController.getOrderById);
 router.post('/:id/pay', protect, orderController.generateOrderPayment)
 router.put('/:id/status', protect, orderController.changeStatus);
+router.post('/simulate-eta', protect, orderController.simulateETA);
 
 module.exports = router;

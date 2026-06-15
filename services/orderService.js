@@ -1,6 +1,7 @@
 const pool = require('../config/db');
 const paymentService = require('./paymentService');
 const { client } = require('../services/whatsappService');
+const { validatePromoCode } = require('./promoService');
 
 const createOrder = async (storeId, customerId, totalPrice, items, promoCode = null, paymentOption = 'NOW') => {
     const client = await pool.connect();
@@ -18,67 +19,25 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
             storeName = storeData.rows[0].store_name;
         }
 
+        let finalTotalPrice = totalPrice;
         let discountAmount = 0;
         let promoId = null;
 
         if (promoCode) {
-            const promoResult = await client.query(
-                'SELECT * FROM promos WHERE promo_code = $1 AND store_id = $2 AND is_active = true',
-                [promoCode.trim().toUpperCase(), storeId]
-            );
-
-            if (promoResult.rows.length > 0) {
-                const promo = promoResult.rows[0];
-                let isEligible = false;
-
-                if (promo.requirement_type === 'NONE') {
-                    isEligible = true;
-                } else if (promo.requirement_type === 'MIN_SPEND') {
-                    if (totalPrice >= promo.requirement_value) isEligible = true;
-                } else if (promo.requirement_type === 'MIN_ORDERS') {
-                    const orderCountResult = await client.query(
-                        `SELECT COUNT(*) FROM orders 
-                         WHERE customer_id = $1 AND store_id = $2 
-                         AND status NOT IN ('Payment Failed', 'Dibatalkan', 'Selesai')`,
-                        [customerId, storeId]
-                    );
-                    const pastOrders = parseInt(orderCountResult.rows[0].count);
-                    if (pastOrders >= promo.requirement_value) isEligible = true;
-                }
-
-                if (isEligible) {
-                    promoId = promo.id;
-                    if (promo.reward_type === 'FIXED') {
-                        discountAmount = promo.reward_value;
-                    } else if (promo.reward_type === 'PERCENT') {
-                        discountAmount = (totalPrice * promo.reward_value) / 100;
-                        if (promo.max_discount && discountAmount > promo.max_discount) {
-                            discountAmount = promo.max_discount;
-                        }
-                    } else if (promo.reward_type === 'FREE_SERVICE') {
-                        const matchingItem = items.find(item => parseInt(item.service_id) === promo.free_service_id);
-                        if (matchingItem) {
-                            discountAmount = matchingItem.price;
-                        }
-                    }
-                }
-            }
+            const promoData = await validatePromoCode(storeId, customerId, promoCode, totalPrice);
+            promoId = promoData.promo_id;
+            discountAmount = promoData.discount_amount;
+            finalTotalPrice = promoData.final_total_price;
         }
-
-        const finalTotalPrice = Math.max(0, totalPrice - discountAmount);
 
         const initialStatus = paymentOption === 'NOW' ? 'Menunggu Pembayaran' : 'Diproses - Belum Dibayar';
 
-        const serviceIds = items.map(item => parseInt(item.service_id));
-        const durationData = await client.query(
-            'SELECT MAX(duration_hours) as max_duration FROM services WHERE id = ANY($1::int[])',
-            [serviceIds]
-        );
-        const maxDurationHours = durationData.rows[0].max_duration || 72;
+        const mainItem = items[0];
+        const etaData = await calculatePredictiveETA(storeId, mainItem.service_id, mainItem.quantity);
 
         const orderResult = await client.query(
             `INSERT INTO orders (store_id, customer_id, total_price, status, promo_id, discount_amount, estimated_completion) 
-             VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP + interval '1 hour' * $7) RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
             [
                 storeId,
                 customerId,
@@ -86,7 +45,7 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
                 initialStatus,
                 promoId,
                 discountAmount,
-                maxDurationHours
+                etaData.estimated_completion_timestamp
             ]
         );
         const newOrder = orderResult.rows[0];
@@ -129,6 +88,13 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
             orderItems.push(itemResult.rows[0]);
         }
 
+        if (promoId) {
+            await client.query(
+                'UPDATE promos SET is_used = true WHERE id = $1 AND customer_id IS NOT NULL',
+                [promoId]
+            );
+        }
+
         let midtransResponse = null;
         if (paymentOption === 'NOW') {
             midtransResponse = await paymentService.createPaymentToken(
@@ -158,12 +124,17 @@ const createOrder = async (storeId, customerId, totalPrice, items, promoCode = n
 
 const getOrdersByStoreId = async (storeId) => {
     const query = `
-        SELECT o.*, c.name as customer_name, c.phone_number 
+        SELECT 
+            o.*, 
+            c.name AS customer_name,
+            c.phone_number AS customer_phone
         FROM orders o
-        JOIN customers c ON o.customer_id = c.id
-        WHERE o.store_id = $1
+        LEFT JOIN customers c ON o.customer_id = c.id
+        WHERE o.store_id = $1 
+        AND o.status NOT IN ('Dibatalkan', 'Canceled')
         ORDER BY o.created_at DESC
     `;
+
     const result = await pool.query(query, [storeId]);
     return result.rows;
 };
@@ -329,4 +300,49 @@ const updateOrderStatusFromMidtrans = async (orderId, transactionStatus) => {
     return newStatus || currentStatus;
 };
 
-module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateStatusAndNotify, generatePaymentForExistingOrder, updateOrderStatusFromMidtrans };
+const calculatePredictiveETA = async (storeId, serviceId, quantity) => {
+    const storeRes = await pool.query(
+        'SELECT operational_hours, total_staff FROM stores WHERE id = $1',
+        [storeId]
+    );
+    const operationalHoursPerDay = storeRes.rows[0]?.operational_hours || 9;
+    const totalStaff = storeRes.rows[0]?.total_staff || 1;
+
+    const serviceRes = await pool.query(
+        'SELECT duration_hours FROM services WHERE id = $1',
+        [serviceId]
+    );
+    const serviceDuration = serviceRes.rows[0]?.duration_hours || 0;
+    const incomingOrderHours = serviceDuration * parseFloat(quantity);
+
+    const activeOrdersQuery = `
+        SELECT COALESCE(SUM(duration_hours), 0) as total_active_hours 
+        FROM orders 
+        WHERE store_id = $1 AND status IN ('Menunggu Validasi', 'Menunggu Pembayaran', 'Diproses')
+    `;
+    const activeOrdersRes = await pool.query(activeOrdersQuery, [storeId]);
+    const activeOrdersHours = parseInt(activeOrdersRes.rows[0].total_active_hours);
+
+    const totalWorkHoursRequired = (incomingOrderHours + activeOrdersHours) / totalStaff;
+
+    const daysRequired = Math.ceil(totalWorkHoursRequired / operationalHoursPerDay);
+
+    const estimatedCompletionDate = new Date();
+    estimatedCompletionDate.setDate(estimatedCompletionDate.getDate() + daysRequired);
+
+    return {
+        estimated_completion_timestamp: estimatedCompletionDate,
+        formatted_eta: estimatedCompletionDate.toLocaleDateString('id-ID', {
+            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        }),
+        debug_info: {
+            operational_hours: operationalHoursPerDay,
+            total_staff: totalStaff,
+            incoming_hours: incomingOrderHours,
+            active_queue_hours: activeOrdersHours,
+            days_required: daysRequired
+        }
+    };
+};
+
+module.exports = { createOrder, getOrdersByStoreId, getOrderDetails, updateStatusAndNotify, generatePaymentForExistingOrder, updateOrderStatusFromMidtrans, calculatePredictiveETA };
