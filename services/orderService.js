@@ -313,23 +313,32 @@ const calculatePredictiveETA = async (storeId, serviceId, quantity) => {
         [serviceId]
     );
     const serviceDuration = serviceRes.rows[0]?.duration_hours || 0;
-    const incomingOrderHours = serviceDuration * parseFloat(quantity);
+
+    const baseSlaDays = Math.ceil(serviceDuration / 24);
+
+    const WORK_HOURS_PER_ITEM = 1;
+    const incomingWorkloadHours = parseFloat(quantity) * WORK_HOURS_PER_ITEM;
 
     const activeOrdersQuery = `
-        SELECT COALESCE(SUM(s.duration_hours * oi.quantity), 0) as total_active_hours 
+        SELECT COALESCE(SUM(oi.quantity), 0) as total_active_items 
         FROM orders o
         JOIN order_items oi ON o.id = oi.order_id
-        JOIN services s ON oi.service_id = s.id
         WHERE o.store_id = $1 AND o.status IN ('Menunggu Validasi', 'Menunggu Pembayaran', 'Diproses')
     `;
     const activeOrdersRes = await pool.query(activeOrdersQuery, [storeId]);
-    const activeOrdersHours = parseFloat(activeOrdersRes.rows[0].total_active_hours);
+    const activeItemsInQueue = parseFloat(activeOrdersRes.rows[0].total_active_items);
 
-    const totalWorkHoursRequired = (incomingOrderHours + activeOrdersHours) / totalStaff;
-    const daysRequired = Math.ceil(totalWorkHoursRequired / operationalHoursPerDay);
+    const activeQueueWorkloadHours = activeItemsInQueue * WORK_HOURS_PER_ITEM;
+
+    const dailyShopCapacity = operationalHoursPerDay * totalStaff;
+    const totalWorkHoursRequired = incomingWorkloadHours + activeQueueWorkloadHours;
+
+    const daysToClearWorkload = Math.ceil(totalWorkHoursRequired / dailyShopCapacity);
+
+    const finalDaysRequired = Math.max(baseSlaDays, daysToClearWorkload);
 
     const estimatedCompletionDate = new Date();
-    estimatedCompletionDate.setDate(estimatedCompletionDate.getDate() + daysRequired);
+    estimatedCompletionDate.setDate(estimatedCompletionDate.getDate() + finalDaysRequired);
 
     return {
         estimated_completion_timestamp: estimatedCompletionDate,
@@ -337,11 +346,10 @@ const calculatePredictiveETA = async (storeId, serviceId, quantity) => {
             weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
         }),
         debug_info: {
-            operational_hours: operationalHoursPerDay,
-            total_staff: totalStaff,
-            incoming_hours: incomingOrderHours,
-            active_queue_hours: activeOrdersHours,
-            days_required: daysRequired
+            base_sla_days: baseSlaDays,
+            queue_days: daysToClearWorkload,
+            final_days_applied: finalDaysRequired,
+            items_in_queue: activeItemsInQueue
         }
     };
 };
