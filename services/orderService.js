@@ -316,15 +316,16 @@ const calculatePredictiveETA = async (storeId, serviceId, quantity) => {
     const incomingOrderHours = serviceDuration * parseFloat(quantity);
 
     const activeOrdersQuery = `
-        SELECT COALESCE(SUM(duration_hours), 0) as total_active_hours 
-        FROM orders 
-        WHERE store_id = $1 AND status IN ('Menunggu Validasi', 'Menunggu Pembayaran', 'Diproses')
+        SELECT COALESCE(SUM(s.duration_hours * oi.quantity), 0) as total_active_hours 
+        FROM orders o
+        JOIN order_items oi ON o.id = oi.order_id
+        JOIN services s ON oi.service_id = s.id
+        WHERE o.store_id = $1 AND o.status IN ('Menunggu Validasi', 'Menunggu Pembayaran', 'Diproses')
     `;
     const activeOrdersRes = await pool.query(activeOrdersQuery, [storeId]);
-    const activeOrdersHours = parseInt(activeOrdersRes.rows[0].total_active_hours);
+    const activeOrdersHours = parseFloat(activeOrdersRes.rows[0].total_active_hours);
 
     const totalWorkHoursRequired = (incomingOrderHours + activeOrdersHours) / totalStaff;
-
     const daysRequired = Math.ceil(totalWorkHoursRequired / operationalHoursPerDay);
 
     const estimatedCompletionDate = new Date();
