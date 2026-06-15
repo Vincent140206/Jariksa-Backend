@@ -131,7 +131,7 @@ const simulateETA = async (req, res) => {
             return res.status(400).json({ status: 'error', message: 'Data tidak lengkap' });
         }
 
-        const etaResult = await calculatePredictiveETA(store_id, service_id, quantity);
+        const etaResult = await orderService.calculatePredictiveETA(store_id, service_id, quantity);
 
         res.status(200).json({
             status: 'success',
