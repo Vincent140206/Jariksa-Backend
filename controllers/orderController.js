@@ -123,9 +123,11 @@ const changeStatus = async (req, res) => {
 
 const simulateETA = async (req, res) => {
     try {
-        const { store_id, service_id, quantity } = req.body;
+        const store_id = req.store.store_id;
 
-        if (!store_id || !service_id || !quantity) {
+        const { service_id, quantity } = req.body;
+
+        if (!service_id || !quantity) {
             return res.status(400).json({ status: 'error', message: 'Data tidak lengkap' });
         }
 
