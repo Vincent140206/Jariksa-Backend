@@ -63,6 +63,7 @@ const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, p
         }
 
         const message = `*Halo ${customerName}!* 👋\n\nTerima kasih telah mempercayakan pesanan Anda kepada *${storeName}*.\n\n*RINGKASAN PESANAN*\nNomor Pesanan: #${orderId}\nTotal Tagihan: Rp${Number(totalPrice).toLocaleString('id-ID')}\nStatus Bayar: *${statusBayar}*\nEstimasi Selesai: *${formattedETA}*${photoSection}\n\nKami akan mengabari Anda kembali jika pesanan sudah siap.`;
+
         await client.sendMessage(chatId, message);
         console.log(`Struk WA berhasil dikirim ke ${cleanNumber}`);
     } catch (error) {
