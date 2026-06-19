@@ -133,7 +133,8 @@ const getOrdersByStoreId = async (storeId) => {
                     json_build_object(
                         'item_id', oi.id,
                         'service_id', s.id,
-                        'service_name', s.service_name,
+                        'service_name', s.service_name, 
+                        'category', cat.name,
                         'quantity', oi.quantity
                     )
                 ) FILTER (WHERE oi.id IS NOT NULL), '[]'
@@ -142,6 +143,7 @@ const getOrdersByStoreId = async (storeId) => {
         LEFT JOIN customers c ON o.customer_id = c.id
         LEFT JOIN order_items oi ON o.id = oi.order_id
         LEFT JOIN services s ON oi.service_id = s.id
+        LEFT JOIN categories cat ON s.category_id = cat.id
         WHERE o.store_id = $1 
         AND o.status NOT IN ('Dibatalkan', 'Canceled')
         GROUP BY o.id, c.id
