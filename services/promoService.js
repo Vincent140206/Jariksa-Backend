@@ -119,12 +119,17 @@ const validatePromoCode = async (storeId, customerId, promoCode, totalPrice) => 
     }
 
     let discountAmount = 0;
+
+    const rewardValue = parseFloat(promo.reward_value) || 0;
+    const currentTotal = parseFloat(totalPrice) || 0;
+    const maxDiscount = promo.max_discount ? parseFloat(promo.max_discount) : null;
+
     if (promo.reward_type === 'FIXED') {
-        discountAmount = promo.reward_value;
+        discountAmount = rewardValue;
     } else if (promo.reward_type === 'PERCENT') {
-        discountAmount = (totalPrice * promo.reward_value) / 100;
-        if (promo.max_discount && discountAmount > promo.max_discount) {
-            discountAmount = promo.max_discount;
+        discountAmount = (currentTotal * rewardValue) / 100;
+        if (maxDiscount !== null && discountAmount > maxDiscount) {
+            discountAmount = maxDiscount;
         }
     }
 
