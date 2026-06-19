@@ -70,9 +70,7 @@ const togglePromoStatus = async (promoId, storeId, isActive) => {
 };
 
 const generateTargetedPromo = async (storeId, customerId, customerName, rewardValue) => {
-    const randomStr = crypto.randomBytes(2).toString('hex').toUpperCase();
-    const cleanName = customerName.replace(/\s+/g, '').toUpperCase().slice(0, 5);
-    const promoCode = `KANGEN-${cleanName}-${randomStr}`;
+    const promoCode = crypto.randomBytes(3).toString('hex').toUpperCase().slice(0, 5);
 
     const query = `
         INSERT INTO promos (
