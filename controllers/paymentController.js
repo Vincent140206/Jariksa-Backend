@@ -10,11 +10,11 @@ const handleMidtransNotification = async (req, res) => {
 
         const actualOrderId = orderIdStr.split('-')[1];
 
-        let newStatus = 'Pending Payment';
+        let newStatus = 'Menunggu Pembayaran';
 
         if (transactionStatus === 'capture' || transactionStatus === 'settlement') {
             if (fraudStatus === 'challenge') {
-                newStatus = 'Payment Challenged';
+                newStatus = 'Menunggu Pembayaran';
             } else {
                 newStatus = 'Diproses';
             }
