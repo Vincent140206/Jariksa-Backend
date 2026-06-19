@@ -64,14 +64,14 @@ const fetchProfile = async (storeId) => {
                 SELECT SUM(total_price) 
                 FROM orders 
                 WHERE store_id = s.id 
-                AND status NOT IN ('Dibatalkan', 'Batal', 'Payment Failed')
+                AND status NOT IN ('Dibatalkan')
             ), 0) AS total_omzet,
 
             COALESCE((
                 SELECT COUNT(id) 
                 FROM orders 
                 WHERE store_id = s.id 
-                AND status NOT IN ('Dibatalkan', 'Batal', 'Payment Failed')
+                AND status NOT IN ('Dibatalkan')
             ), 0) AS total_order
 
         FROM stores s

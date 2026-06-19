@@ -111,7 +111,7 @@ const getCustomerProfileDetails = async (storeId, customerId) => {
         SELECT 
             c.id, c.name, c.phone_number,
             COUNT(o.id) as total_kunjungan,
-            COALESCE(SUM(CASE WHEN o.status NOT IN ('Payment Failed', 'Dibatalkan') THEN o.total_price ELSE 0 END), 0) as total_pengeluaran,
+            COALESCE(SUM(CASE WHEN o.status NOT IN ('Dibatalkan') THEN o.total_price ELSE 0 END), 0) as total_pengeluaran,
             EXTRACT(DAY FROM NOW() - MAX(o.created_at)) as terakhir_datang_hari_lalu,
             CASE 
                 WHEN COUNT(o.id) >= 15 THEN 'Setia'
