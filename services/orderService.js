@@ -134,7 +134,7 @@ const getOrdersByStoreId = async (storeId) => {
                         'item_id', oi.id,
                         'service_id', s.id,
                         'service_name', s.service_name, 
-                        'category', cat.name,
+                        'category', cat.category_name,
                         'quantity', oi.quantity
                     )
                 ) FILTER (WHERE oi.id IS NOT NULL), '[]'
