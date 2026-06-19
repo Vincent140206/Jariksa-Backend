@@ -64,13 +64,18 @@ const getDashboardData = async (storeId) => {
 
     const recentQuery = `
         SELECT o.id, 
-            o.status, -- Langsung panggil statusnya aja, udah nggak perlu di-translate!
+            o.status, 
             o.created_at, 
             c.name as customer_name,
-            (SELECT s.service_name FROM order_items oi JOIN services s ON oi.service_id = s.id WHERE oi.order_id = o.id LIMIT 1) as main_service
+            s.service_name as main_service,
+            cat.category_name as category
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        LEFT JOIN services s ON oi.service_id = s.id
+        LEFT JOIN categories cat ON s.category_id = cat.id
         WHERE o.store_id = $1
+        GROUP BY o.id, c.name, s.service_name, cat.category_name
         ORDER BY o.created_at DESC
         LIMIT 5
     `;
