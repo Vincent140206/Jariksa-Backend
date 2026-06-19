@@ -145,7 +145,7 @@ const getOrdersByStoreId = async (storeId) => {
         LEFT JOIN services s ON oi.service_id = s.id
         LEFT JOIN categories cat ON s.category_id = cat.id
         WHERE o.store_id = $1 
-        AND o.status NOT IN ('Dibatalkan', 'Canceled')
+        AND o.status NOT IN ('Dibatalkan')
         GROUP BY o.id, c.id
         ORDER BY o.created_at DESC
     `;

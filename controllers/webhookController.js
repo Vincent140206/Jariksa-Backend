@@ -17,7 +17,7 @@ const midtransNotification = async (req, res) => {
         const calculatedSignature = hash.digest('hex');
 
         if (notification.signature_key !== calculatedSignature) {
-            console.log('❌ Webhook diblokir: Signature tidak cocok!');
+            console.log('Webhook diblokir: Signature tidak cocok!');
             return res.status(403).json({ status: 'error', message: 'Invalid signature' });
         }
 

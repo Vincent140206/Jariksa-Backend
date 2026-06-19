@@ -6,7 +6,7 @@ const getDashboardData = async (storeId) => {
             COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN total_price ELSE 0 END), 0) AS today_income,
             COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE - INTERVAL '1 day' THEN total_price ELSE 0 END), 0) AS yesterday_income
         FROM orders 
-        WHERE store_id = $1 AND status NOT IN ('Payment Failed', 'Canceled', 'Batal')
+        WHERE store_id = $1 AND status NOT IN ('Payment Failed', 'Dibatalkan')
     `;
     const incomeResult = await pool.query(incomeQuery, [storeId]);
     const { today_income, yesterday_income } = incomeResult.rows[0];
@@ -21,7 +21,7 @@ const getDashboardData = async (storeId) => {
     const statusQuery = `
         SELECT status, COUNT(*) as count 
         FROM orders 
-        WHERE store_id = $1 AND status NOT IN ('Canceled', 'Batal', 'Payment Failed')
+        WHERE store_id = $1 AND status NOT IN ('Dibatalkan', 'Batal', 'Payment Failed')
         GROUP BY status
     `;
     const statusResult = await pool.query(statusQuery, [storeId]);

@@ -106,10 +106,17 @@ const sendTargetedPromo = async (req, res) => {
 
         await whatsappService.sendPlainMessage(customerPhone, waMessage);
 
+        const cleanData = {
+            promo_name: newPromo.promo_name,
+            promo_code: newPromo.promo_code,
+            description: newPromo.description,
+            discount_amount: parseInt(newPromo.reward_value)
+        };
+
         res.status(201).json({
             status: 'success',
             message: `Promo eksklusif berhasil dibuat dan dikirim ke ${customerName}!`,
-            data: newPromo
+            data: cleanData
         });
     } catch (error) {
         res.status(500).json({ status: 'error', message: error.message });
