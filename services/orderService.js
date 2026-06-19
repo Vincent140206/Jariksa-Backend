@@ -133,7 +133,7 @@ const getOrdersByStoreId = async (storeId) => {
                     json_build_object(
                         'item_id', oi.id,
                         'service_id', s.id,
-                        'service_name', s.name,
+                        'service_name', s.service_name,
                         'quantity', oi.quantity
                     )
                 ) FILTER (WHERE oi.id IS NOT NULL), '[]'
