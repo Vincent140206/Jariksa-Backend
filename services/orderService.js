@@ -338,7 +338,7 @@ const calculatePredictiveETA = async (storeId, serviceId, quantity) => {
         SELECT COALESCE(SUM(oi.quantity), 0) as total_active_items 
         FROM orders o
         JOIN order_items oi ON o.id = oi.order_id
-        WHERE o.store_id = $1 AND o.status IN ('Menunggu Validasi', 'Menunggu Pembayaran', 'Diproses')
+        WHERE o.store_id = $1 AND o.status IN ('Menunggu Pembayaran', 'Diproses')
     `;
     const activeOrdersRes = await pool.query(activeOrdersQuery, [storeId]);
     const activeItemsInQueue = parseFloat(activeOrdersRes.rows[0].total_active_items);

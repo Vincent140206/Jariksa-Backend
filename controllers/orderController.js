@@ -25,18 +25,6 @@ const createNewOrder = async (req, res) => {
             finalPaymentOption
         );
 
-        whatsappService.sendReceiptWA(
-            result.customer.phone_number,
-            result.customer.name,
-            result.order.id,
-            result.order.total_price,
-            finalPaymentOption,
-            result.store_name,
-            result.order.estimated_completion
-        );
-
-        if (result.customer) delete result.customer;
-
         let allImageUrls = [];
         if (result.items && result.items.length > 0) {
             const firstItem = result.items[0];
@@ -46,6 +34,20 @@ const createNewOrder = async (req, res) => {
                     : firstItem.image_urls;
             }
         }
+
+        whatsappService.sendReceiptWA(
+            result.customer.phone_number,
+            result.customer.name,
+            result.order.id,
+            result.order.total_price,
+            finalPaymentOption,
+            result.store_name,
+            result.order.estimated_completion,
+            allImageUrls
+        );
+
+        if (result.customer) delete result.customer;
+
         res.status(201).json({
             status: 'success',
             message: 'Order created successfully',
