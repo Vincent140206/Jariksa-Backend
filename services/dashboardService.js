@@ -64,17 +64,9 @@ const getDashboardData = async (storeId) => {
 
     const recentQuery = `
         SELECT o.id, 
-            CASE o.status
-                WHEN 'Pending Payment' THEN 'Menunggu Pembayaran'
-                WHEN 'Processing - Unpaid' THEN 'Diproses - Belum Dibayar'
-                WHEN 'Processing' THEN 'Diproses'
-                WHEN 'Paid & Processing' THEN 'Diproses'
-                WHEN 'Ready for Pickup' THEN 'Siap Diambil'
-                WHEN 'Completed' THEN 'Selesai'
-                WHEN 'Delayed' THEN 'Terlambat'
-                ELSE o.status
-            END as status, 
-            o.created_at, c.name as customer_name,
+            o.status, -- Langsung panggil statusnya aja, udah nggak perlu di-translate!
+            o.created_at, 
+            c.name as customer_name,
             (SELECT s.service_name FROM order_items oi JOIN services s ON oi.service_id = s.id WHERE oi.order_id = o.id LIMIT 1) as main_service
         FROM orders o
         JOIN customers c ON o.customer_id = c.id
