@@ -29,7 +29,7 @@ const initializeWhatsApp = () => {
     client.initialize();
 };
 
-const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption, storeName = 'JaRiksa', estimatedCompletion = null) => {
+const sendReceiptWA = async (customerPhone, customerName, orderId, totalPrice, paymentOption, storeName = 'JaRiksa', estimatedCompletion = null, allImageUrls) => {
     if (!isReady) {
         console.log('WhatsApp belum siap. Pesan ditunda.');
         return;
