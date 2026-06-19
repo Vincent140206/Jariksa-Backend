@@ -150,7 +150,7 @@ const getOrdersByStoreId = async (storeId) => {
 
     const result = await pool.query(query, [storeId]);
     return result.rows;
-}; s
+};
 
 const getOrderDetails = async (orderId, storeId) => {
     const orderQuery = `
