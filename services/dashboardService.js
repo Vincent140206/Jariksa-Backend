@@ -33,25 +33,17 @@ const getDashboardData = async (storeId) => {
 
         switch (row.status) {
             case 'Menunggu Pembayaran':
-            case 'Pending Payment':
                 operasional.masuk += count;
                 break;
 
             case 'Diproses':
-            case 'Diproses - Belum Bayar':
-            case 'Processing':
-            case 'Processing - Unpaid':
-            case 'Paid & Processing':
+            case 'Diproses - Belum Dibayar':
             case 'Terlambat':
-            case 'Delayed':
                 operasional.diproses += count;
                 break;
 
-            // Kelompok Selesai
             case 'Siap Diambil':
             case 'Selesai':
-            case 'Ready for Pickup':
-            case 'Completed':
                 operasional.selesai += count;
                 break;
 
@@ -64,7 +56,7 @@ const getDashboardData = async (storeId) => {
         SELECT COUNT(*) as count 
         FROM orders 
         WHERE store_id = $1 
-        AND status IN ('Diproses', 'Diproses - Belum Bayar', 'Menunggu Pembayaran', 'Terlambat', 'Processing', 'Processing - Unpaid', 'Pending Payment', 'Paid & Processing', 'Delayed')
+        AND status IN ('Diproses', 'Diproses - Belum Dibayar', 'Menunggu Pembayaran', 'Terlambat')
         AND estimated_completion < CURRENT_TIMESTAMP
     `;
     const lateResult = await pool.query(lateQuery, [storeId]);
@@ -74,7 +66,7 @@ const getDashboardData = async (storeId) => {
         SELECT o.id, 
             CASE o.status
                 WHEN 'Pending Payment' THEN 'Menunggu Pembayaran'
-                WHEN 'Processing - Unpaid' THEN 'Diproses - Belum Bayar'
+                WHEN 'Processing - Unpaid' THEN 'Diproses - Belum Dibayar'
                 WHEN 'Processing' THEN 'Diproses'
                 WHEN 'Paid & Processing' THEN 'Diproses'
                 WHEN 'Ready for Pickup' THEN 'Siap Diambil'
