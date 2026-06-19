@@ -37,10 +37,22 @@ const createNewOrder = async (req, res) => {
 
         if (result.customer) delete result.customer;
 
+        let allImageUrls = [];
+        if (result.items && result.items.length > 0) {
+            const firstItem = result.items[0];
+            if (firstItem.image_urls) {
+                allImageUrls = typeof firstItem.image_urls === 'string'
+                    ? JSON.parse(firstItem.image_urls)
+                    : firstItem.image_urls;
+            }
+        }
         res.status(201).json({
             status: 'success',
             message: 'Order created successfully',
-            data: result
+            data: {
+                ...result,
+                image_url: allImageUrls
+            }
         });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
