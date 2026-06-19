@@ -127,17 +127,30 @@ const getOrdersByStoreId = async (storeId) => {
         SELECT 
             o.*, 
             c.name AS customer_name,
-            c.phone_number AS customer_phone
+            c.phone_number AS customer_phone,
+            COALESCE(
+                json_agg(
+                    json_build_object(
+                        'item_id', oi.id,
+                        'service_id', s.id,
+                        'service_name', s.name,
+                        'quantity', oi.quantity
+                    )
+                ) FILTER (WHERE oi.id IS NOT NULL), '[]'
+            ) AS order_details
         FROM orders o
         LEFT JOIN customers c ON o.customer_id = c.id
+        LEFT JOIN order_items oi ON o.id = oi.order_id
+        LEFT JOIN services s ON oi.service_id = s.id
         WHERE o.store_id = $1 
         AND o.status NOT IN ('Dibatalkan', 'Canceled')
+        GROUP BY o.id, c.id
         ORDER BY o.created_at DESC
     `;
 
     const result = await pool.query(query, [storeId]);
     return result.rows;
-};
+}; s
 
 const getOrderDetails = async (orderId, storeId) => {
     const orderQuery = `
