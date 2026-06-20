@@ -18,6 +18,10 @@ const createPaymentToken = async (orderId, grossAmount, customerName, customerPh
                 "first_name": customerName,
                 "phone": customerPhone
             },
+            "custom_expiry": {
+                "expiry_duration": 15,
+                "unit": "minute"
+            }
         };
 
         const transaction = await snap.createTransaction(parameter);
