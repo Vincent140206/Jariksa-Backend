@@ -31,8 +31,8 @@ const createPaymentToken = async (orderId, grossAmount, customerName, customerPh
             },
             "expiry": {
                 "start_time": formatMidtransDate(new Date()),
-                "expiry_duration": 15,
-                "unit": "minute"
+                "unit": "minute",
+                "duration": 15
             }
         };
         console.log(JSON.stringify(parameter, null, 2));
