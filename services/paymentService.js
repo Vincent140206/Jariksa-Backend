@@ -1,11 +1,13 @@
-const midtransClient = require('midtrans-client');
-require('dotenv').config();
-
-const snap = new midtransClient.Snap({
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
-    serverKey: process.env.MIDTRANS_SERVER_KEY,
-    clientKey: process.env.MIDTRANS_CLIENT_KEY
-});
+const formatMidtransDate = (date) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    const mm = pad(date.getMonth() + 1);
+    const dd = pad(date.getDate());
+    const hh = pad(date.getHours());
+    const mi = pad(date.getMinutes());
+    const ss = pad(date.getSeconds());
+    return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss} +0700`;
+};
 
 const createPaymentToken = async (orderId, grossAmount, customerName, customerPhone) => {
     try {
@@ -19,6 +21,7 @@ const createPaymentToken = async (orderId, grossAmount, customerName, customerPh
                 "phone": customerPhone
             },
             "expiry": {
+                "start_time": formatMidtransDate(new Date()),
                 "expiry_duration": 15,
                 "unit": "minute"
             }
@@ -30,5 +33,3 @@ const createPaymentToken = async (orderId, grossAmount, customerName, customerPh
         throw new Error('Failed to generate Midtrans token: ' + error.message);
     }
 };
-
-module.exports = { createPaymentToken };
