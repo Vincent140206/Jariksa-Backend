@@ -35,7 +35,7 @@ const createPaymentToken = async (orderId, grossAmount, customerName, customerPh
                 "unit": "minute"
             }
         };
-
+        console.log(JSON.stringify(parameter, null, 2));
         const transaction = await snap.createTransaction(parameter);
         return transaction;
     } catch (error) {
