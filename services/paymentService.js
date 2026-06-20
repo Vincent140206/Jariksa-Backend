@@ -9,12 +9,13 @@ const snap = new midtransClient.Snap({
 
 const formatMidtransDate = (date) => {
     const pad = (n) => String(n).padStart(2, '0');
-    const yyyy = date.getFullYear();
-    const mm = pad(date.getMonth() + 1);
-    const dd = pad(date.getDate());
-    const hh = pad(date.getHours());
-    const mi = pad(date.getMinutes());
-    const ss = pad(date.getSeconds());
+    const wib = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+    const yyyy = wib.getUTCFullYear();
+    const mm = pad(wib.getUTCMonth() + 1);
+    const dd = pad(wib.getUTCDate());
+    const hh = pad(wib.getUTCHours());
+    const mi = pad(wib.getUTCMinutes());
+    const ss = pad(wib.getUTCSeconds());
     return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss} +0700`;
 };
 
