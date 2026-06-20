@@ -1,3 +1,6 @@
+const midtransClient = require('midtrans-client');
+require('dotenv').config();
+
 const formatMidtransDate = (date) => {
     const pad = (n) => String(n).padStart(2, '0');
     const yyyy = date.getFullYear();
@@ -33,3 +36,5 @@ const createPaymentToken = async (orderId, grossAmount, customerName, customerPh
         throw new Error('Failed to generate Midtrans token: ' + error.message);
     }
 };
+
+module.exports = { createPaymentToken };
